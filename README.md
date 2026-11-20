@@ -41,11 +41,13 @@ ran, next to the result count.
   comments, then the numbers, CRM notes and other posts. Passing the mouse
   over the thumbnails flips through them. The arrow keys keep moving between
   creators while it is open.
-- **Filters and sort.** A sidebar holds sort order and every filter the
-  search understands: stage, creator type, place, followers, engagement, US
-  audience and topic. A typed brief fills it in; changing it refines the
-  brief. The chips above the grid show how the brief was read and can be
-  removed one by one. Tab in the empty search box fills in a suggested brief.
+- **Filters.** A collapsible sidebar holds every filter the search
+  understands: stage, creator type and gender as tick boxes with counts,
+  followers, engagement and US audience as sliders with a typed box beside
+  each, plus place and topic. A typed brief fills it in ("women", "male
+  creators" set the gender filter); changing it refines the brief. The chips
+  above the grid show how the brief was read and can be removed one by one.
+  Sort order sits above the grid.
 - **Shortlist.** `S` adds the focused creator. The tray totals reach and cost,
   survives a reload, and "Copy shortlist" produces text for a brand: the brief,
   one line per roster creator with reach, US audience and price, a total, then
@@ -65,6 +67,12 @@ on 10 held out):
 | LLM + keywords | 45/46, 7/10 | 0.81, 0.80 | 0.71, 0.80 | 5/5 |
 | rules + embeddings | 46/46, 7/10 | 0.84, 0.59 | 0.79, 0.89 | 2/5 |
 | LLM + embeddings (default with a key) | 45/46, 7/10 | 0.83, 0.63 | 0.75, 1.00 | 3/5 |
+
+Four briefs about gender were added later the same day, making 60. With them,
+rules + keywords scored 50/50 filters and P@5 0.89 on the tuned set (held out
+unchanged at 7/10 and 0.80), and LLM + embeddings scored 50/50 and 0.85 (held
+out 6/10 and 0.63 on that run). The other two combinations were not rerun, so
+the table above is the 56-brief run.
 
 On this templated data the no-key baseline is the most precise. Embeddings win
 on paraphrase ("getting better rest at night" goes from none of five right to

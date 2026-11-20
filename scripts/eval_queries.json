@@ -1,58 +1,730 @@
 [
-  {"query": "Fitness creators in Florida under 100K who post about energy drinks", "filters": {"niches": ["fitness"], "locations": ["FL"], "maxFollowers": 100000}, "relevant_if_caption_has": ["energy drink", "pre-workout", "caffeine"]},
-  {"query": "Micro beauty creators with engagement over 5%", "filters": {"niches": ["beauty"], "minFollowers": 10000, "maxFollowers": 100000, "minEngagement": 5}},
-  {"query": "Runners who review shoes", "filters": {"niches": ["running"]}, "relevant_if_caption_has": ["running shoes", "racing shoes"]},
-  {"query": "Skincare in New York or Los Angeles, 50K+, sunscreen", "filters": {"niches": ["skincare"], "locations": ["NY", "Los Angeles"], "minFollowers": 50000}, "relevant_if_caption_has": ["sunscreen", "spf"]},
-  {"query": "creators who post about running shoes", "filters": {"niches": []}, "relevant_if_caption_has": ["running shoes", "racing shoes"]},
-  {"query": "someone in Miami who does pilates", "filters": {"locations": ["Miami"]}, "relevant_if_caption_has": ["pilates"]},
-  {"query": "streetwear creators in London or Toronto", "filters": {"niches": ["streetwear"], "locations": ["London", "Toronto"]}},
-  {"query": "20-100K fashion creators who do wedding guest outfits", "filters": {"niches": ["fashion"], "minFollowers": 20000, "maxFollowers": 100000}, "relevant_if_caption_has": ["wedding guest"]},
-  {"query": "hair creators over 200k", "filters": {"niches": ["hair"], "minFollowers": 200000}},
-  {"query": "who talks about caffeine before the gym", "filters": {"niches": []}, "relevant_if_caption_has": ["energy drink", "pre-workout", "caffeine"]},
-  {"query": "creators for a sunscreen launch", "filters": {"niches": []}, "relevant_if_caption_has": ["sunscreen", "spf"]},
-  {"query": "high protein recipe creators in Texas", "filters": {"locations": ["TX"]}, "relevant_if_caption_has": ["protein"]},
-  {"query": "wellness creators in California with at least 4% engagement who talk about sleep", "filters": {"niches": ["wellness"], "locations": ["CA"], "minEngagement": 4}, "relevant_if_caption_has": ["sleep"]},
-  {"query": "marathon training content, under 50k followers", "filters": {"maxFollowers": 50000}, "relevant_if_caption_has": ["marathon"]},
-  {"query": "beauty creators in the UK", "filters": {"niches": ["beauty"], "locations": ["GBR"]}},
-  {"query": "beauty creators with a US audience", "filters": {"niches": ["beauty"], "locations": [], "minAudienceUS": 50}},
-  {"query": "skincare with mostly American followers in Florida", "filters": {"niches": ["skincare"], "locations": ["FL"], "minAudienceUS": 50}},
-  {"query": "signed runners", "filters": {"niches": ["running"], "stages": ["roster"]}},
-  {"query": "applicants who post about sunscreen", "filters": {"niches": [], "stages": ["applicant"]}, "relevant_if_caption_has": ["sunscreen", "spf"]},
-  {"query": "fashion creators not signed yet", "filters": {"niches": ["fashion"], "stages": ["applicant", "prospect"]}},
-  {"query": "roster creators open to paid usage", "filters": {"niches": [], "stages": ["roster"]}, "relevant_if_note_has": ["paid usage"]},
-  {"query": "something to drink before lifting", "kind": "paraphrase", "filters": {"niches": []}, "relevant_if_caption_has": ["energy drink", "pre-workout", "caffeine"]},
-  {"query": "stuff that keeps your face from burning at the beach", "kind": "paraphrase", "filters": {"niches": []}, "relevant_if_caption_has": ["sunscreen", "spf"]},
-  {"query": "footwear for long distance", "kind": "paraphrase", "filters": {"niches": []}, "relevant_if_caption_has": ["running shoes", "racing shoes"]},
-  {"query": "getting better rest at night", "kind": "paraphrase", "filters": {"niches": []}, "relevant_if_caption_has": ["sleep"]},
-  {"query": "hair ties for the gym", "kind": "topic-not-niche", "filters": {"niches": []}, "relevant_if_caption_has": ["stays put through a workout"]},
-  {"query": "fitness creators who post about running", "kind": "topic-not-niche", "filters": {"niches": ["fitness"]}, "relevant_if_caption_has": ["run"]},
-  {"query": "food creators who talk about marathon training", "kind": "topic-not-niche", "filters": {"niches": ["food"]}, "relevant_if_caption_has": ["marathon"]},
-  {"query": "beauty creators with a quarter million plus", "kind": "odd-range", "filters": {"niches": ["beauty"], "minFollowers": 250000, "maxFollowers": null}},
-  {"query": "fitness creators between fifty and a hundred thousand followers", "kind": "odd-range", "filters": {"niches": ["fitness"], "minFollowers": 50000, "maxFollowers": 100000}},
-  {"query": "streetwear creators with no more than 30,000 followers", "kind": "odd-range", "filters": {"niches": ["streetwear"], "minFollowers": null, "maxFollowers": 30000}},
-  {"query": "skincare creators, 10k–50k", "kind": "odd-range", "filters": {"niches": ["skincare"], "minFollowers": 10000, "maxFollowers": 50000}},
-  {"query": "hair creators in Texas or Georgia", "kind": "two-places", "filters": {"niches": ["hair"], "locations": ["TX", "GA"]}},
-  {"query": "fitness creators in Miami and Orlando who post about protein", "kind": "two-places", "filters": {"niches": ["fitness"], "locations": ["Miami", "Orlando"]}, "relevant_if_caption_has": ["protein"]},
-  {"query": "fitnes creaters in Flordia", "kind": "misspelling", "filters": {"niches": ["fitness"], "locations": ["FL"]}},
-  {"query": "skincare creators who post about sunscrean", "kind": "misspelling", "filters": {"niches": ["skincare"]}, "relevant_if_caption_has": ["sunscreen", "spf"]},
-  {"query": "streatwear creators in Los Angelas", "kind": "misspelling", "filters": {"niches": ["streetwear"], "locations": ["Los Angeles"]}},
-  {"query": "beauty creators over 5 million followers", "kind": "nobody", "filters": {"niches": ["beauty"], "minFollowers": 5000000}, "expect_empty": true},
-  {"query": "creators who post about cryptocurrency trading", "kind": "nobody", "filters": {"niches": []}, "expect_empty": true},
-  {"query": "fitness creators in Tokyo", "kind": "nobody", "filters": {"niches": ["fitness"]}, "expect_empty": true},
-  {"query": "prospects in California with a mostly American audience", "kind": "pipeline", "filters": {"stages": ["prospect"], "locations": ["CA"], "minAudienceUS": 50}},
-  {"query": "creators we haven't signed who post about pilates", "kind": "pipeline", "filters": {"stages": ["applicant", "prospect"]}, "relevant_if_caption_has": ["pilates"]},
-  {"query": "lifestyle creators with 70%+ US followers", "kind": "pipeline", "filters": {"niches": ["lifestyle"], "locations": [], "minAudienceUS": 70}},
-  {"query": "who on the roster declines gifting", "kind": "pipeline", "filters": {"stages": ["roster"]}, "relevant_if_note_has": ["gifting"]},
-  {"query": "Fitness creators in Florida who post about energy drinks", "kind": "pipeline", "filters": {"niches": ["fitness"], "locations": ["FL"], "stages": []}, "relevant_if_caption_has": ["energy drink"]},
-  {"query": "UK based creators with a US audience", "kind": "pipeline", "filters": {"locations": ["GBR"], "minAudienceUS": 50}},
-  {"query": "sneakerheads in New York", "kind": "held-out", "held_out": true, "filters": {"niches": ["streetwear"], "locations": ["NY"]}},
-  {"query": "yoga teachers with over 80k followers", "kind": "held-out", "held_out": true, "filters": {"niches": ["wellness"], "minFollowers": 80000}},
-  {"query": "makeup tutorials from creators in Chicago", "kind": "held-out", "held_out": true, "filters": {"niches": [], "locations": ["Chicago"]}, "relevant_if_caption_has": ["makeup"]},
-  {"query": "anyone under 20k who posts thrift hauls", "kind": "held-out", "held_out": true, "filters": {"niches": [], "maxFollowers": 20000}, "relevant_if_caption_has": ["thrift"]},
-  {"query": "roster talent in Texas with 60% or more of their audience in the US", "kind": "held-out", "held_out": true, "filters": {"stages": ["roster"], "locations": ["TX"], "minAudienceUS": 60}},
-  {"query": "creaters in Calfornia who post about meal prep", "kind": "held-out", "held_out": true, "filters": {"niches": [], "locations": ["CA"]}, "relevant_if_caption_has": ["meal prep"]},
-  {"query": "top beauty and haircare creators, half a million and up", "kind": "held-out", "held_out": true, "filters": {"niches": ["beauty", "hair"], "minFollowers": 500000}},
-  {"query": "prospects who review protein powder", "kind": "held-out", "held_out": true, "filters": {"niches": [], "stages": ["prospect"]}, "relevant_if_caption_has": ["protein"]},
-  {"query": "cold plunge content from signed creators", "kind": "held-out", "held_out": true, "filters": {"niches": [], "stages": ["roster"]}, "relevant_if_caption_has": ["cold plunge"]},
-  {"query": "people who post what they eat in a day", "kind": "held-out", "held_out": true, "filters": {"niches": []}, "relevant_if_caption_has": ["what i eat in a day"]}
+  {
+    "query": "Fitness creators in Florida under 100K who post about energy drinks",
+    "filters": {
+      "niches": [
+        "fitness"
+      ],
+      "locations": [
+        "FL"
+      ],
+      "maxFollowers": 100000
+    },
+    "relevant_if_caption_has": [
+      "energy drink",
+      "pre-workout",
+      "caffeine"
+    ]
+  },
+  {
+    "query": "Micro beauty creators with engagement over 5%",
+    "filters": {
+      "niches": [
+        "beauty"
+      ],
+      "minFollowers": 10000,
+      "maxFollowers": 100000,
+      "minEngagement": 5
+    }
+  },
+  {
+    "query": "Runners who review shoes",
+    "filters": {
+      "niches": [
+        "running"
+      ]
+    },
+    "relevant_if_caption_has": [
+      "running shoes",
+      "racing shoes"
+    ]
+  },
+  {
+    "query": "Skincare in New York or Los Angeles, 50K+, sunscreen",
+    "filters": {
+      "niches": [
+        "skincare"
+      ],
+      "locations": [
+        "NY",
+        "Los Angeles"
+      ],
+      "minFollowers": 50000
+    },
+    "relevant_if_caption_has": [
+      "sunscreen",
+      "spf"
+    ]
+  },
+  {
+    "query": "creators who post about running shoes",
+    "filters": {
+      "niches": []
+    },
+    "relevant_if_caption_has": [
+      "running shoes",
+      "racing shoes"
+    ]
+  },
+  {
+    "query": "someone in Miami who does pilates",
+    "filters": {
+      "locations": [
+        "Miami"
+      ]
+    },
+    "relevant_if_caption_has": [
+      "pilates"
+    ]
+  },
+  {
+    "query": "streetwear creators in London or Toronto",
+    "filters": {
+      "niches": [
+        "streetwear"
+      ],
+      "locations": [
+        "London",
+        "Toronto"
+      ]
+    }
+  },
+  {
+    "query": "20-100K fashion creators who do wedding guest outfits",
+    "filters": {
+      "niches": [
+        "fashion"
+      ],
+      "minFollowers": 20000,
+      "maxFollowers": 100000
+    },
+    "relevant_if_caption_has": [
+      "wedding guest"
+    ]
+  },
+  {
+    "query": "hair creators over 200k",
+    "filters": {
+      "niches": [
+        "hair"
+      ],
+      "minFollowers": 200000
+    }
+  },
+  {
+    "query": "who talks about caffeine before the gym",
+    "filters": {
+      "niches": []
+    },
+    "relevant_if_caption_has": [
+      "energy drink",
+      "pre-workout",
+      "caffeine"
+    ]
+  },
+  {
+    "query": "creators for a sunscreen launch",
+    "filters": {
+      "niches": []
+    },
+    "relevant_if_caption_has": [
+      "sunscreen",
+      "spf"
+    ]
+  },
+  {
+    "query": "high protein recipe creators in Texas",
+    "filters": {
+      "locations": [
+        "TX"
+      ]
+    },
+    "relevant_if_caption_has": [
+      "protein"
+    ]
+  },
+  {
+    "query": "wellness creators in California with at least 4% engagement who talk about sleep",
+    "filters": {
+      "niches": [
+        "wellness"
+      ],
+      "locations": [
+        "CA"
+      ],
+      "minEngagement": 4
+    },
+    "relevant_if_caption_has": [
+      "sleep"
+    ]
+  },
+  {
+    "query": "marathon training content, under 50k followers",
+    "filters": {
+      "maxFollowers": 50000
+    },
+    "relevant_if_caption_has": [
+      "marathon"
+    ]
+  },
+  {
+    "query": "beauty creators in the UK",
+    "filters": {
+      "niches": [
+        "beauty"
+      ],
+      "locations": [
+        "GBR"
+      ]
+    }
+  },
+  {
+    "query": "beauty creators with a US audience",
+    "filters": {
+      "niches": [
+        "beauty"
+      ],
+      "locations": [],
+      "minAudienceUS": 50
+    }
+  },
+  {
+    "query": "skincare with mostly American followers in Florida",
+    "filters": {
+      "niches": [
+        "skincare"
+      ],
+      "locations": [
+        "FL"
+      ],
+      "minAudienceUS": 50
+    }
+  },
+  {
+    "query": "signed runners",
+    "filters": {
+      "niches": [
+        "running"
+      ],
+      "stages": [
+        "roster"
+      ]
+    }
+  },
+  {
+    "query": "applicants who post about sunscreen",
+    "filters": {
+      "niches": [],
+      "stages": [
+        "applicant"
+      ]
+    },
+    "relevant_if_caption_has": [
+      "sunscreen",
+      "spf"
+    ]
+  },
+  {
+    "query": "fashion creators not signed yet",
+    "filters": {
+      "niches": [
+        "fashion"
+      ],
+      "stages": [
+        "applicant",
+        "prospect"
+      ]
+    }
+  },
+  {
+    "query": "roster creators open to paid usage",
+    "filters": {
+      "niches": [],
+      "stages": [
+        "roster"
+      ]
+    },
+    "relevant_if_note_has": [
+      "paid usage"
+    ]
+  },
+  {
+    "query": "something to drink before lifting",
+    "kind": "paraphrase",
+    "filters": {
+      "niches": []
+    },
+    "relevant_if_caption_has": [
+      "energy drink",
+      "pre-workout",
+      "caffeine"
+    ]
+  },
+  {
+    "query": "stuff that keeps your face from burning at the beach",
+    "kind": "paraphrase",
+    "filters": {
+      "niches": []
+    },
+    "relevant_if_caption_has": [
+      "sunscreen",
+      "spf"
+    ]
+  },
+  {
+    "query": "footwear for long distance",
+    "kind": "paraphrase",
+    "filters": {
+      "niches": []
+    },
+    "relevant_if_caption_has": [
+      "running shoes",
+      "racing shoes"
+    ]
+  },
+  {
+    "query": "getting better rest at night",
+    "kind": "paraphrase",
+    "filters": {
+      "niches": []
+    },
+    "relevant_if_caption_has": [
+      "sleep"
+    ]
+  },
+  {
+    "query": "hair ties for the gym",
+    "kind": "topic-not-niche",
+    "filters": {
+      "niches": []
+    },
+    "relevant_if_caption_has": [
+      "stays put through a workout"
+    ]
+  },
+  {
+    "query": "fitness creators who post about running",
+    "kind": "topic-not-niche",
+    "filters": {
+      "niches": [
+        "fitness"
+      ]
+    },
+    "relevant_if_caption_has": [
+      "run"
+    ]
+  },
+  {
+    "query": "food creators who talk about marathon training",
+    "kind": "topic-not-niche",
+    "filters": {
+      "niches": [
+        "food"
+      ]
+    },
+    "relevant_if_caption_has": [
+      "marathon"
+    ]
+  },
+  {
+    "query": "beauty creators with a quarter million plus",
+    "kind": "odd-range",
+    "filters": {
+      "niches": [
+        "beauty"
+      ],
+      "minFollowers": 250000,
+      "maxFollowers": null
+    }
+  },
+  {
+    "query": "fitness creators between fifty and a hundred thousand followers",
+    "kind": "odd-range",
+    "filters": {
+      "niches": [
+        "fitness"
+      ],
+      "minFollowers": 50000,
+      "maxFollowers": 100000
+    }
+  },
+  {
+    "query": "streetwear creators with no more than 30,000 followers",
+    "kind": "odd-range",
+    "filters": {
+      "niches": [
+        "streetwear"
+      ],
+      "minFollowers": null,
+      "maxFollowers": 30000
+    }
+  },
+  {
+    "query": "skincare creators, 10k–50k",
+    "kind": "odd-range",
+    "filters": {
+      "niches": [
+        "skincare"
+      ],
+      "minFollowers": 10000,
+      "maxFollowers": 50000
+    }
+  },
+  {
+    "query": "hair creators in Texas or Georgia",
+    "kind": "two-places",
+    "filters": {
+      "niches": [
+        "hair"
+      ],
+      "locations": [
+        "TX",
+        "GA"
+      ]
+    }
+  },
+  {
+    "query": "fitness creators in Miami and Orlando who post about protein",
+    "kind": "two-places",
+    "filters": {
+      "niches": [
+        "fitness"
+      ],
+      "locations": [
+        "Miami",
+        "Orlando"
+      ]
+    },
+    "relevant_if_caption_has": [
+      "protein"
+    ]
+  },
+  {
+    "query": "fitnes creaters in Flordia",
+    "kind": "misspelling",
+    "filters": {
+      "niches": [
+        "fitness"
+      ],
+      "locations": [
+        "FL"
+      ]
+    }
+  },
+  {
+    "query": "skincare creators who post about sunscrean",
+    "kind": "misspelling",
+    "filters": {
+      "niches": [
+        "skincare"
+      ]
+    },
+    "relevant_if_caption_has": [
+      "sunscreen",
+      "spf"
+    ]
+  },
+  {
+    "query": "streatwear creators in Los Angelas",
+    "kind": "misspelling",
+    "filters": {
+      "niches": [
+        "streetwear"
+      ],
+      "locations": [
+        "Los Angeles"
+      ]
+    }
+  },
+  {
+    "query": "beauty creators over 5 million followers",
+    "kind": "nobody",
+    "filters": {
+      "niches": [
+        "beauty"
+      ],
+      "minFollowers": 5000000
+    },
+    "expect_empty": true
+  },
+  {
+    "query": "creators who post about cryptocurrency trading",
+    "kind": "nobody",
+    "filters": {
+      "niches": []
+    },
+    "expect_empty": true
+  },
+  {
+    "query": "fitness creators in Tokyo",
+    "kind": "nobody",
+    "filters": {
+      "niches": [
+        "fitness"
+      ]
+    },
+    "expect_empty": true
+  },
+  {
+    "query": "prospects in California with a mostly American audience",
+    "kind": "pipeline",
+    "filters": {
+      "stages": [
+        "prospect"
+      ],
+      "locations": [
+        "CA"
+      ],
+      "minAudienceUS": 50
+    }
+  },
+  {
+    "query": "creators we haven't signed who post about pilates",
+    "kind": "pipeline",
+    "filters": {
+      "stages": [
+        "applicant",
+        "prospect"
+      ]
+    },
+    "relevant_if_caption_has": [
+      "pilates"
+    ]
+  },
+  {
+    "query": "lifestyle creators with 70%+ US followers",
+    "kind": "pipeline",
+    "filters": {
+      "niches": [
+        "lifestyle"
+      ],
+      "locations": [],
+      "minAudienceUS": 70
+    }
+  },
+  {
+    "query": "who on the roster declines gifting",
+    "kind": "pipeline",
+    "filters": {
+      "stages": [
+        "roster"
+      ]
+    },
+    "relevant_if_note_has": [
+      "gifting"
+    ]
+  },
+  {
+    "query": "Fitness creators in Florida who post about energy drinks",
+    "kind": "pipeline",
+    "filters": {
+      "niches": [
+        "fitness"
+      ],
+      "locations": [
+        "FL"
+      ],
+      "stages": []
+    },
+    "relevant_if_caption_has": [
+      "energy drink"
+    ]
+  },
+  {
+    "query": "UK based creators with a US audience",
+    "kind": "pipeline",
+    "filters": {
+      "locations": [
+        "GBR"
+      ],
+      "minAudienceUS": 50
+    }
+  },
+  {
+    "query": "sneakerheads in New York",
+    "kind": "held-out",
+    "held_out": true,
+    "filters": {
+      "niches": [
+        "streetwear"
+      ],
+      "locations": [
+        "NY"
+      ]
+    }
+  },
+  {
+    "query": "yoga teachers with over 80k followers",
+    "kind": "held-out",
+    "held_out": true,
+    "filters": {
+      "niches": [
+        "wellness"
+      ],
+      "minFollowers": 80000
+    }
+  },
+  {
+    "query": "makeup tutorials from creators in Chicago",
+    "kind": "held-out",
+    "held_out": true,
+    "filters": {
+      "niches": [],
+      "locations": [
+        "Chicago"
+      ]
+    },
+    "relevant_if_caption_has": [
+      "makeup"
+    ]
+  },
+  {
+    "query": "anyone under 20k who posts thrift hauls",
+    "kind": "held-out",
+    "held_out": true,
+    "filters": {
+      "niches": [],
+      "maxFollowers": 20000
+    },
+    "relevant_if_caption_has": [
+      "thrift"
+    ]
+  },
+  {
+    "query": "roster talent in Texas with 60% or more of their audience in the US",
+    "kind": "held-out",
+    "held_out": true,
+    "filters": {
+      "stages": [
+        "roster"
+      ],
+      "locations": [
+        "TX"
+      ],
+      "minAudienceUS": 60
+    }
+  },
+  {
+    "query": "creaters in Calfornia who post about meal prep",
+    "kind": "held-out",
+    "held_out": true,
+    "filters": {
+      "niches": [],
+      "locations": [
+        "CA"
+      ]
+    },
+    "relevant_if_caption_has": [
+      "meal prep"
+    ]
+  },
+  {
+    "query": "top beauty and haircare creators, half a million and up",
+    "kind": "held-out",
+    "held_out": true,
+    "filters": {
+      "niches": [
+        "beauty",
+        "hair"
+      ],
+      "minFollowers": 500000
+    }
+  },
+  {
+    "query": "prospects who review protein powder",
+    "kind": "held-out",
+    "held_out": true,
+    "filters": {
+      "niches": [],
+      "stages": [
+        "prospect"
+      ]
+    },
+    "relevant_if_caption_has": [
+      "protein"
+    ]
+  },
+  {
+    "query": "cold plunge content from signed creators",
+    "kind": "held-out",
+    "held_out": true,
+    "filters": {
+      "niches": [],
+      "stages": [
+        "roster"
+      ]
+    },
+    "relevant_if_caption_has": [
+      "cold plunge"
+    ]
+  },
+  {
+    "query": "people who post what they eat in a day",
+    "kind": "held-out",
+    "held_out": true,
+    "filters": {
+      "niches": []
+    },
+    "relevant_if_caption_has": [
+      "what i eat in a day"
+    ]
+  },
+  {
+    "query": "Women who post about energy drinks",
+    "filters": {
+      "genders": [
+        "woman"
+      ]
+    },
+    "relevant_if_caption_has": [
+      "energy drink",
+      "pre-workout",
+      "caffeine"
+    ],
+    "added": "gender"
+  },
+  {
+    "query": "Male skincare creators who post about sunscreen",
+    "filters": {
+      "niches": [
+        "skincare"
+      ],
+      "genders": [
+        "man"
+      ]
+    },
+    "relevant_if_caption_has": [
+      "sunscreen",
+      "spf"
+    ],
+    "added": "gender"
+  },
+  {
+    "query": "Fitness guys in Los Angeles",
+    "filters": {
+      "niches": [
+        "fitness"
+      ],
+      "locations": [
+        "Los Angeles"
+      ],
+      "genders": [
+        "man"
+      ]
+    },
+    "added": "gender"
+  },
+  {
+    "query": "Runners who review women's running shoes",
+    "filters": {
+      "niches": [
+        "running"
+      ]
+    },
+    "relevant_if_caption_has": [
+      "running shoes",
+      "racing shoes"
+    ],
+    "added": "gender"
+  }
 ]

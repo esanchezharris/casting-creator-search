@@ -1,11 +1,11 @@
 import creatorsJson from "../../data/creators.json";
 import { closest } from "./fuzzy";
-import { Creator, LocationFilter, NICHES, ParsedQuery, Stage, STAGES } from "./types";
+import { Creator, GENDERS, LocationFilter, NICHES, ParsedQuery, Stage, STAGES } from "./types";
 
 const creators = creatorsJson as Creator[];
 
 export const emptyQuery = (): ParsedQuery => ({
-  niches: [], locations: [], stages: [], minFollowers: null, maxFollowers: null,
+  niches: [], locations: [], stages: [], genders: [], minFollowers: null, maxFollowers: null,
   minEngagement: null, minAudienceUS: null, semantic: "",
 });
 
@@ -141,6 +141,10 @@ export function parseWithRules(query: string): ParsedQuery {
   take(/(?<![a-z])(?:applicants?|applications?|applied)(?![a-z])/, () => addStages("applicant"));
   take(/(?<![a-z])(?:prospects?|scouted)(?![a-z])/, () => addStages("prospect"));
 
+  // Gender, only from plain words. "Women's running shoes" is a topic, so a possessive is left alone.
+  take(/(?<![a-z])(?:women|woman|females?|ladies|girls)(?![a-z'’])/, () => { out.genders.push("woman"); });
+  take(/(?<![a-z])(?:men|man|males?|guys)(?![a-z'’])/, () => { out.genders.push("man"); });
+
   // Audience location, before places: "US audience" is about followers, "in Florida" about the creator.
   const US = String.raw`(?<![a-z])(?:u\.?s\.?(?:a\.?)?|united states|american?|stateside)(?![a-z])`;
   const AUD = String.raw`(?:audience|followers|following|viewers|reach)`;
@@ -249,13 +253,15 @@ Return only a JSON object with these keys:
 - "minFollowers", "maxFollowers": integers or null. "micro" means 10000-100000, "nano" means under 10000, "macro" means over 500000. Leave both null unless the request states a size; never guess one.
 - "minEngagement": number (percent) or null.
 - "stages": array, each one of ["roster","applicant","prospect"]. Empty unless the request says so. "signed" or "on the roster" means ["roster"]. "applicants" means ["applicant"]. "prospects" means ["prospect"]. "not signed yet" or "worth signing" means ["applicant","prospect"].
+- "genders": array, each one of ["woman","man"]. Empty unless the request asks for women or men ("female creators", "guys who..."). A product for women or men ("women's running shoes") is a topic, not a gender.
 - "minAudienceUS": number 0-100 or null. The minimum share of the creator's AUDIENCE that is in the US. "US audience" or "mostly American followers" with no number means 50. This is about followers, not where the creator lives: "in Florida" is a location, not an audience filter.
 - "semantic": the topic, product or vibe to match against their posts, as a short phrase. Empty string if the request is filters only. It is matched against post captions and CRM notes, so "open to paid usage" or "delivers early" belong here. Never repeat a niche, place, stage or number here.
 
 Examples:
-"micro foodies in Chicago with a mostly US audience who post about air fryers" -> {"niches":["food"],"locations":["Chicago"],"stages":[],"minFollowers":10000,"maxFollowers":100000,"minEngagement":null,"minAudienceUS":50,"semantic":"air fryers"}
-"applicants who post about trail shoes" -> {"niches":[],"locations":[],"stages":["applicant"],"minFollowers":null,"maxFollowers":null,"minEngagement":null,"minAudienceUS":null,"semantic":"trail shoes"}
-"a snack for after the gym" -> {"niches":[],"locations":[],"stages":[],"minFollowers":null,"maxFollowers":null,"minEngagement":null,"minAudienceUS":null,"semantic":"a snack for after the gym"}`;
+"micro foodies in Chicago with a mostly US audience who post about air fryers" -> {"niches":["food"],"locations":["Chicago"],"stages":[],"genders":[],"minFollowers":10000,"maxFollowers":100000,"minEngagement":null,"minAudienceUS":50,"semantic":"air fryers"}
+"applicants who post about trail shoes" -> {"niches":[],"locations":[],"stages":["applicant"],"genders":[],"minFollowers":null,"maxFollowers":null,"minEngagement":null,"minAudienceUS":null,"semantic":"trail shoes"}
+"women who run and review men's trail shoes" -> {"niches":["running"],"locations":[],"stages":[],"genders":["woman"],"minFollowers":null,"maxFollowers":null,"minEngagement":null,"minAudienceUS":null,"semantic":"men's trail shoes"}
+"a snack for after the gym" -> {"niches":[],"locations":[],"stages":[],"genders":[],"minFollowers":null,"maxFollowers":null,"minEngagement":null,"minAudienceUS":null,"semantic":"a snack for after the gym"}`;
 
 export const llmConfigured = () => !!process.env.OPENAI_API_KEY;
 
@@ -282,6 +288,8 @@ export function sanitize(raw: unknown): ParsedQuery {
   out.minEngagement = num(r.minEngagement);
   if (Array.isArray(r.stages))
     out.stages = STAGES.filter((st) => (r.stages as unknown[]).some((x) => typeof x === "string" && x.toLowerCase() === st));
+  if (Array.isArray(r.genders))
+    out.genders = GENDERS.filter((g) => (r.genders as unknown[]).some((x) => typeof x === "string" && x.toLowerCase() === g));
   const us = num(r.minAudienceUS);
   out.minAudienceUS = us == null ? null : Math.min(100, Math.round(us));
   if (out.minFollowers != null && out.maxFollowers != null && out.minFollowers > out.maxFollowers)
@@ -310,6 +318,8 @@ export async function parseWithLLM(query: string): Promise<ParsedQuery> {
   // found one in the same sentence, keep it rather than silently searching on filters alone.
   const rules = parseWithRules(query);
   if (!parsed.semantic) parsed.semantic = rules.semantic;
+  // Gender is read from plain words, which the rules do exactly; the model is not asked to guess it.
+  parsed.genders = rules.genders;
   // Numbers are where the model slips ("50K+" came back as 500000) and where the rules are
   // exact. When the rules read a figure out of the sentence, theirs wins.
   for (const key of ["minFollowers", "maxFollowers", "minEngagement", "minAudienceUS"] as const) {

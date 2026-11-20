@@ -101,7 +101,7 @@ export function Ticks({ count, index, show }: { count: number; index: number; sh
 
 export function StageBadge({ stage }: { stage: Stage }) {
   return (
-    <Badge variant={stage === "roster" ? "secondary" : "outline"} className={cn("h-[22px] px-2 text-[13px] font-normal", stage === "roster" ? "bg-muted" : "border-foreground/40")}>
+    <Badge variant={stage === "roster" ? "secondary" : "outline"} className={cn("h-[22px] rounded-[5px] px-1.5 text-[13px] font-normal", stage === "roster" ? "bg-muted" : "border-foreground/40")}>
       {STAGE_LABEL[stage]}
     </Badge>
   );
@@ -111,15 +111,16 @@ export function StageBadge({ stage }: { stage: Stage }) {
 export function Facts({ creator, className }: { creator: Creator; className?: string }) {
   const facts: [string, string][] = [
     [compact(creator.recentReach), "reach"],
-    [`${creator.engagement}%`, "engaged"],
+    // Short labels and a compact rate, so four numbers fit under a narrow card without truncating.
+    [`${creator.engagement}%`, "eng."],
     [`${creator.audience.us}%`, "US"],
-    creator.rate != null ? [money(creator.rate), "a reel"] : ["None", "no rate"],
+    creator.rate != null ? [`$${compact(creator.rate)}`, "rate"] : ["None", "rate"],
   ];
   return (
     <dl className={cn("grid grid-cols-4 gap-2", className)}>
       {facts.map(([value, label]) => (
         <div key={label} className="min-w-0">
-          <dd className="truncate text-[15px] font-medium tabular-nums">{value}</dd>
+          <dd className="truncate text-[14px] font-medium tabular-nums">{value}</dd>
           <dt className="truncate text-[13px] text-muted-foreground">{label}</dt>
         </div>
       ))}
@@ -174,7 +175,7 @@ export const CreatorCard = forwardRef<HTMLElement, Props>(function CreatorCard(
       tabIndex={-1}
       data-card
       className={cn(
-        "group/card flex flex-col rounded-[22px] border border-transparent p-2 outline-none transition-colors duration-150",
+        "group/card flex flex-col rounded-2xl border border-transparent p-2 outline-none transition-colors duration-150",
         focused && "border-border bg-card",
       )}
       onPointerEnter={(e) => { setNear(true); if (e.pointerType === "mouse") onFocus(); }}
@@ -215,9 +216,9 @@ export const CreatorCard = forwardRef<HTMLElement, Props>(function CreatorCard(
         </Tooltip>
       </div>
 
-      <div className="flex flex-1 flex-col px-1.5 pt-3 pb-1.5">
+      <div className="flex flex-1 flex-col px-1 pt-2.5 pb-1">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="min-w-0 text-[16px] leading-tight font-medium tracking-[-0.01em]">
+          <h3 className="min-w-0 text-[15px] leading-tight font-medium">
             <button onClick={onOpen} className="max-w-full truncate text-left underline-offset-4 hover:underline">
               {creator.name}
             </button>
@@ -226,10 +227,10 @@ export const CreatorCard = forwardRef<HTMLElement, Props>(function CreatorCard(
         </div>
         <p className="mt-0.5 truncate text-[13px] text-muted-foreground">{nichesOf(creator)} · {placeOf(creator)}</p>
 
-        <Facts creator={creator} className="mt-3" />
+        <Facts creator={creator} className="mt-2.5" />
 
         {warning && <Warning text={warning} className="mt-3" />}
-        {reason && <p className="mt-3 line-clamp-2 text-[13px] leading-snug text-muted-foreground">{reason}</p>}
+        {reason && <p className="mt-2.5 line-clamp-2 text-[13px] leading-snug text-muted-foreground">{reason}</p>}
       </div>
     </article>
   );

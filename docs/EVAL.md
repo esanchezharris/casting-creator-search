@@ -184,3 +184,26 @@ matches. That has not been built or measured.
 
 The script prints which parser and ranker actually answered. To force a mode,
 start the app with `PARSER=rules` and/or `RANKER=keywords`.
+
+## Addendum: gender filter (20 Nov 2026, later)
+
+A gender filter was added (rule-based only: "women", "female", "men", "male",
+"guys"; a possessive such as "women's running shoes" is left as topic text).
+The eval now fails any case where the parser reads a gender that was not asked
+for, and four cases were added to `scripts/eval_queries.json` (60 in all).
+
+| Parser + ranker | Set | Filters | P@5 | Recall | Nobody fits |
+| --- | --- | --- | --- | --- | --- |
+| rules + keywords | tuned (50) | 50/50 | 0.89 | 0.77 | 4/4 |
+| rules + keywords | held out (10) | 7/10 | 0.80 | 0.80 | 1/1 |
+| LLM + embeddings | tuned (50) | 50/50 | 0.85 | 0.75 | 2/4 |
+| LLM + embeddings | held out (10) | 6/10 | 0.63 | 1.00 | 1/1 |
+
+All four new cases passed in both modes, and no earlier case picked up a
+gender it should not have. LLM + keywords and rules + embeddings were not
+rerun. The held-out filter score for LLM + embeddings moved from 7/10 to 6/10
+on this run: the model read "people who post what they eat in a day" as food
+creators, which is the run-to-run variation noted above, not the new rule.
+The new cases were written alongside the rule, so they belong to the tuned
+set and say nothing about briefs phrased differently ("female-identifying",
+"dudes", "moms").

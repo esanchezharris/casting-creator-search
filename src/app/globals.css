@@ -27,7 +27,7 @@
   --border: #d9d6cf;
   --input: #d9d6cf;
   --ring: #171715;
-  --radius: 0.75rem;
+  --radius: 0.625rem;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
@@ -76,7 +76,7 @@
    Switching is instant on purpose, because it follows the pointer. */
 .frame {
   position: relative; aspect-ratio: 4 / 5; overflow: hidden;
-  border-radius: var(--radius-xl); background: var(--muted);
+  border-radius: 12px; background: var(--muted);
   cursor: ew-resize; touch-action: pan-y; user-select: none; -webkit-user-select: none;
 }
 .frame img {

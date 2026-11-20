@@ -13,6 +13,7 @@ export function applyFilters(q: ParsedQuery): Creator[] {
   return creators.filter((c) => {
     if (q.niches.length && !q.niches.some((n) => c.niches.includes(n))) return false;
     if (q.locations.length && !q.locations.some((l) => c[l.field] === l.value)) return false;
+    if (q.genders.length && !q.genders.includes(c.gender)) return false;
     if (q.minFollowers != null && c.followers < q.minFollowers) return false;
     if (q.maxFollowers != null && c.followers > q.maxFollowers) return false;
     if (q.minEngagement != null && c.engagement < q.minEngagement) return false;
@@ -20,6 +21,17 @@ export function applyFilters(q: ParsedQuery): Creator[] {
     return true;
   });
 }
+
+/** Counts per filter value over the whole database, for the numbers beside the sidebar options. */
+export const FACETS: Record<string, number> = (() => {
+  const out: Record<string, number> = {};
+  const add = (k: string) => { out[k] = (out[k] ?? 0) + 1; };
+  for (const c of creators) {
+    add(`stage:${c.stage}`); add(`gender:${c.gender}`);
+    for (const n of c.niches) add(`niche:${n}`);
+  }
+  return out;
+})();
 
 // ------------------------------------------------------- keyword ranking
 

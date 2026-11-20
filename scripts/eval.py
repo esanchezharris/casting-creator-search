@@ -45,6 +45,9 @@ def filters_ok(expected: dict, parsed: dict) -> bool:
         return False
     if "stages" in expected and sorted(expected["stages"]) != sorted(parsed["stages"]):
         return False
+    # Gender is checked on every case: reading one where none was asked for would silently drop people.
+    if sorted(expected.get("genders", [])) != sorted(parsed.get("genders", [])):
+        return False
     for key in ("minFollowers", "maxFollowers", "minEngagement", "minAudienceUS"):
         if key in expected and expected[key] != parsed[key]:
             return False
@@ -62,6 +65,8 @@ def passes(c: dict, f: dict) -> bool:
     if f.get("niches") and not set(f["niches"]) & set(c["niches"]):
         return False
     if f.get("locations") and not any(v in (c["city"], c["region"], c["country"]) for v in f["locations"]):
+        return False
+    if f.get("genders") and c["gender"] not in f["genders"]:
         return False
     if f.get("minFollowers") and c["followers"] < f["minFollowers"]:
         return False

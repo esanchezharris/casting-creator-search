@@ -55,7 +55,8 @@ three stages. It does not crawl social platforms for strangers.
 - `src/app/api/search/route.ts`: `POST {query}` or `POST {filters}` (chips
   edited in the UI). Returns which parser and ranker actually ran.
 - `src/app/page.tsx` and `src/components/`: a dashboard. `FilterPanel` is the
-  sidebar (sort and every filter), `FilterChips` shows how the brief was read,
+  collapsible sidebar (tick boxes with counts, sliders with typed boxes;
+  gender is one of the filters), `FilterChips` shows how the brief was read,
   `CreatorCard` has the scrub preview (pointer x-position over the photo picks
   the image), `QuickLook` is a modal laid out like a post: media on the left,
   the post for that photo with likes and top comments on the right.

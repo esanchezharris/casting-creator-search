@@ -22,6 +22,7 @@ const followerText = (q: ParsedQuery) =>
 export function summarize(q: ParsedQuery): string {
   const parts: string[] = [];
   if (q.stages.length) parts.push(q.stages.map((s) => STAGE_CHIP[s]).join(" or "));
+  if (q.genders.length) parts.push(q.genders.map((g) => (g === "woman" ? "women" : "men")).join(" or "));
   if (q.niches.length) parts.push(q.niches.join(" or "));
   if (q.locations.length) parts.push(`in ${q.locations.map((l) => l.label).join(" or ")}`);
   if (q.minFollowers != null || q.maxFollowers != null) parts.push(`${followerText(q)} followers`);
@@ -77,8 +78,8 @@ function PercentEditor({ name, hint, value, apply }: { name: string; hint: strin
 
 type Kind = "followers" | "engagement" | "audience";
 
-const chip = "inline-flex h-8 items-center rounded-full border bg-card text-[14px] whitespace-nowrap";
-const remove = "press mr-1 grid size-6 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground";
+const chip = "inline-flex h-7 items-center rounded-md border bg-card text-[13px] whitespace-nowrap";
+const remove = "press mr-0.5 grid size-6 place-items-center rounded-[5px] text-muted-foreground hover:bg-muted hover:text-foreground";
 const option = "press h-7 rounded-full border bg-secondary px-2.5 text-[13px] hover:border-foreground";
 
 /**
@@ -107,14 +108,14 @@ export function FilterChips({ parsed: q, places, onChange, addClassName }: { par
   const dim = (s: string) => <span className="text-muted-foreground">{s}</span>;
   const plain = (key: string, label: React.ReactNode, without: FilterEdit) => (
     <span key={key} className={chip}>
-      <span className="pr-1.5 pl-3">{label}</span>
+      <span className="pr-1 pl-2">{label}</span>
       <button className={remove} aria-label="Remove this filter" onClick={() => apply(without)}><X className="size-3.5" /></button>
     </span>
   );
   const editable = (kind: Kind, label: React.ReactNode, without: FilterEdit) => (
     <span key={kind} className={chip}>
       <Popover open={open === kind} onOpenChange={(o) => setOpen(o ? kind : null)}>
-        <PopoverTrigger render={<button className="flex h-full items-center gap-1.5 rounded-l-full pr-1.5 pl-3" title="Change" />}>
+        <PopoverTrigger render={<button className="flex h-full items-center gap-1.5 rounded-l-md pr-1 pl-2" title="Change" />}>
           <span>{label}</span><ChevronDown className="size-3.5 text-muted-foreground" />
         </PopoverTrigger>
         <PopoverContent align="start" sideOffset={8} className="w-72 p-3.5 text-[15px]">{editors[kind]}</PopoverContent>
@@ -123,7 +124,7 @@ export function FilterChips({ parsed: q, places, onChange, addClassName }: { par
     </span>
   );
 
-  const any = q.niches.length || q.locations.length || q.stages.length || has.followers || has.engagement || has.audience || q.semantic;
+  const any = q.niches.length || q.locations.length || q.stages.length || q.genders.length || has.followers || has.engagement || has.audience || q.semantic;
   const freeNiches = NICHES.filter((n) => !q.niches.includes(n));
   const freeStages = STAGES.filter((s) => !q.stages.includes(s));
   const typed = place.trim().toLowerCase();
@@ -132,9 +133,10 @@ export function FilterChips({ parsed: q, places, onChange, addClassName }: { par
     .slice(0, typed ? 8 : 6);
 
   return (
-    <div className="flex min-h-8 flex-wrap items-center gap-1.5" aria-live="polite">
+    <div className="flex min-h-7 flex-wrap items-center gap-1.5" aria-live="polite">
       <span className="mr-1 text-[13px] text-muted-foreground">{any ? "Read as" : "No filters"}</span>
       {q.stages.map((s) => plain(`st-${s}`, STAGE_CHIP[s], { ...q, stages: q.stages.filter((x) => x !== s) }))}
+      {q.genders.map((g) => plain(`g-${g}`, g === "woman" ? "women" : "men", { ...q, genders: q.genders.filter((x) => x !== g) }))}
       {q.niches.map((n) => plain(`n-${n}`, n, { ...q, niches: q.niches.filter((x) => x !== n) }))}
       {q.locations.map((l) => plain(`l-${l.field}-${l.value}`, <>{dim("in")} {l.label}</>, { ...q, locations: q.locations.filter((x) => x !== l) }))}
       {has.followers && editable("followers", <>{followerText(q)} {dim("followers")}</>, { ...q, minFollowers: null, maxFollowers: null })}

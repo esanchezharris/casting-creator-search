@@ -12,6 +12,7 @@ export type Creator = {
   id: string;
   name: string;
   handle: string;
+  gender: Gender;
   /** Where the creator sits in the pipeline. Only roster creators have a partner, campaigns and a rate. */
   stage: Stage;
   partner: string | null;
@@ -39,6 +40,9 @@ export type Creator = {
   video?: string;
 };
 
+export type Gender = "woman" | "man";
+export const GENDERS: Gender[] = ["woman", "man"];
+
 export type LocationFilter = {
   field: "city" | "region" | "country";
   value: string;
@@ -51,6 +55,8 @@ export type ParsedQuery = {
   locations: LocationFilter[];
   /** Empty means "roster first": roster creators, then the rest if the roster is thin. */
   stages: Stage[];
+  /** Empty means anyone. */
+  genders: Gender[];
   minFollowers: number | null;
   maxFollowers: number | null;
   minEngagement: number | null;
@@ -78,6 +84,8 @@ export type SearchResponse = {
   offRoster: SearchResult[];
   /** Place names the "Add filter" control can offer. */
   places: string[];
+  /** How many creators carry each filter value, across the whole database, shown beside the options. */
+  facets: Record<string, number>;
   tookMs: number;
 };
 

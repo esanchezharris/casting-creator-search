@@ -171,6 +171,9 @@ TAGLINES = {
 PRIMARY = (["fitness"] * 10 + ["beauty"] * 8 + ["fashion"] * 8 + ["skincare"] * 6 + ["running"] * 6 +
            ["hair"] * 5 + ["streetwear"] * 5 + ["wellness"] * 5 + ["lifestyle"] * 4 + ["food"] * 3)
 
+# Used for the gender filter and for the generated photos (scripts/media_prompts.py uses the same list).
+MEN = {"Marcus", "Theo", "Julian", "Kai", "Mateo", "Andre", "Leo", "Omar", "Felix", "Devon"}
+
 PARTNERS = ["Marisol", "Jonah", "Bea", "Tariq", "Wren"]  # fictional talent partners
 
 OTHER_MARKETS = ["United Kingdom", "Brazil", "India", "Canada", "Mexico", "Germany", "Australia", "Philippines"]
@@ -285,6 +288,7 @@ def build(n: int, seed: int) -> list[dict]:
             "id": cid,
             "name": f"{first} {last}",
             "handle": handle,
+            "gender": "man" if first in MEN else "woman",
             "stage": stage,
             "partner": rnd.choice(PARTNERS) if on_roster else None,
             "campaigns": rnd.randint(1, 14) if on_roster else None,

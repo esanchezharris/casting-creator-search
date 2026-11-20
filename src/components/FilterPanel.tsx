@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, X } from "lucide-react";
+import { X } from "lucide-react";
 import { compact } from "@/components/CreatorCard";
 import { parseCount, type FilterEdit } from "@/components/FilterChips";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
-import { NICHES, STAGES, type ParsedQuery, type Stage } from "@/lib/types";
+import { Slider } from "@/components/ui/slider";
+import { GENDERS, NICHES, STAGES, type Gender, type ParsedQuery, type Stage } from "@/lib/types";
 
 const STAGE_NAME: Record<Stage, string> = { roster: "Roster", applicant: "Applicants", prospect: "Prospects" };
+const GENDER_NAME: Record<Gender, string> = { woman: "Women", man: "Men" };
 
 export type Sort = "match" | "reach" | "followers" | "engagement" | "rate";
 export const SORTS: [Sort, string][] = [
@@ -16,110 +18,168 @@ export const SORTS: [Sort, string][] = [
   ["engagement", "Engagement"], ["rate", "Lowest rate"],
 ];
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/** How many filters are set, for the badge on the button that reopens the panel. */
+export const activeCount = (q: ParsedQuery) =>
+  q.niches.length + q.locations.length + q.stages.length + q.genders.length
+  + [q.minFollowers ?? q.maxFollowers, q.minEngagement, q.minAudienceUS, q.semantic || null].filter((v) => v != null).length;
+
+// The follower slider is logarithmic, because the roster runs from a few thousand to about a
+// million and the interesting differences are at the small end. Either end stop means "no limit".
+const F_MIN = 5_000, F_MAX = 1_000_000, F_STEPS = 100;
+const toFollowers = (t: number) => {
+  const v = F_MIN * Math.pow(F_MAX / F_MIN, t / F_STEPS);
+  const unit = v < 10_000 ? 500 : v < 100_000 ? 5_000 : 50_000;
+  return Math.round(v / unit) * unit;
+};
+const toStop = (v: number | null, fallback: number) =>
+  v == null ? fallback : Math.max(0, Math.min(F_STEPS, Math.round((Math.log(v / F_MIN) / Math.log(F_MAX / F_MIN)) * F_STEPS)));
+
+function Section({ title, value, children }: { title: string; value?: string; children: React.ReactNode }) {
   return (
-    <section className="border-t py-4">
-      <h2 className="mb-2.5 text-[13px] font-medium">{title}</h2>
+    <section className="border-b px-4 py-3.5 last:border-b-0">
+      <h2 className="mb-2 flex items-baseline justify-between text-[13px] font-medium">
+        {title}
+        {value && <span className="font-normal text-muted-foreground tabular-nums">{value}</span>}
+      </h2>
       {children}
     </section>
   );
 }
 
-/**
- * A text box that holds its own draft and commits on Enter or when focus
- * leaves, so the grid does not refetch on every keystroke.
- */
-function Field({ value, onCommit, label, suffix, ...rest }: {
+/** A tick-box row with the number of creators in the database that carry the value. */
+function Option({ label, count, checked, onToggle }: { label: string; count?: number; checked: boolean; onToggle: () => void }) {
+  return (
+    <label className="-mx-1.5 flex h-7 cursor-pointer items-center gap-2.5 rounded-md px-1.5 text-[14px] hover:bg-muted/60">
+      <Checkbox checked={checked} onCheckedChange={onToggle} className="border-foreground/35 bg-card" />
+      <span className="flex-1 capitalize">{label}</span>
+      {count != null && <span className="text-[13px] text-muted-foreground tabular-nums">{count}</span>}
+    </label>
+  );
+}
+
+/** A small text box that holds its own draft and commits on Enter or when focus leaves. */
+function Typed({ value, onCommit, label, suffix, ...rest }: {
   value: string; onCommit: (text: string) => void; label: string; suffix?: string;
 } & Omit<React.ComponentProps<"input">, "value" | "onChange">) {
   const [text, setText] = useState(value);
   useEffect(() => setText(value), [value]);
   const commit = () => { if (text.trim() !== value) onCommit(text.trim()); };
   return (
-    <label className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] text-muted-foreground">
-      <span className="sr-only">{label}</span>
+    <span className="relative block">
       <Input
         {...rest} value={text} aria-label={label}
-        className="h-8 bg-card text-[14px] text-foreground"
+        className={`h-7 rounded-md bg-card px-2 text-[13px] tabular-nums ${suffix ? "pr-6" : ""}`}
         onChange={(e) => setText(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commit(); } }}
       />
-      {suffix}
-    </label>
+      {suffix && <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-[13px] text-muted-foreground">{suffix}</span>}
+    </span>
   );
 }
 
-const row = "press flex h-8 w-full items-center justify-between rounded-lg px-2 text-left text-[14px] hover:bg-muted";
-const pill = "press h-7 rounded-full border px-2.5 text-[13px] capitalize";
+/** One-thumb "at least" slider with a typed box. Zero means no minimum. */
+function MinSlider({ title, value, max, step, hint, label, onCommit }: {
+  title: string; value: number | null; max: number; step: number; hint?: string; label: string; onCommit: (v: number | null) => void;
+}) {
+  const [drag, setDrag] = useState(value ?? 0);
+  useEffect(() => setDrag(value ?? 0), [value]);
+  return (
+    <Section title={title} value={drag > 0 ? `${drag}% or more` : "Any"}>
+      <div className="flex items-center gap-3">
+        <Slider
+          labels={[label]} className="flex-1" min={0} max={max} step={step} value={[drag]}
+          onValueChange={(v) => setDrag((v as number[])[0])}
+          onValueCommitted={(v) => onCommit((v as number[])[0] > 0 ? (v as number[])[0] : null)}
+        />
+        <span className="w-[58px] shrink-0">
+          <Typed
+            label={`${label}, typed`} placeholder="Any" suffix="%" inputMode="decimal" value={value != null ? String(value) : ""}
+            onCommit={(t) => { const n = parseFloat(t); onCommit(isFinite(n) && n > 0 ? Math.min(100, n) : null); }}
+          />
+        </span>
+      </div>
+      {hint && <p className="mt-2 text-[13px] leading-snug text-muted-foreground">{hint}</p>}
+    </Section>
+  );
+}
 
 type Props = {
   parsed: ParsedQuery;
   places: string[];
-  sort: Sort;
-  onSort: (s: Sort) => void;
+  facets: Record<string, number>;
   onChange: (next: FilterEdit) => void;
-  onReset: () => void;
 };
 
 /**
- * The always-visible controls: sort order and every filter the search
- * understands. It edits the same parsed query the brief produced, so typing a
- * brief fills this panel in and changing the panel refines the brief.
+ * Every filter the search understands, always in the same place. It edits the
+ * same parsed query a typed brief produces, so a brief fills this panel in and
+ * changing the panel refines the brief.
  */
-export function FilterPanel({ parsed: q, places, sort, onSort, onChange, onReset }: Props) {
+export function FilterPanel({ parsed: q, places, facets, onChange }: Props) {
   const [place, setPlace] = useState("");
   const typed = place.trim().toLowerCase();
   const suggestions = places
     .filter((p) => !q.locations.some((l) => l.label === p) && (!typed || p.toLowerCase().includes(typed)))
     .slice(0, typed ? 6 : 4);
   const toggle = <T,>(list: T[], item: T) => (list.includes(item) ? list.filter((x) => x !== item) : [...list, item]);
-  const active = q.niches.length + q.locations.length + q.stages.length
-    + [q.minFollowers ?? q.maxFollowers, q.minEngagement, q.minAudienceUS, q.semantic || null].filter((v) => v != null).length;
+
+  const [range, setRange] = useState([toStop(q.minFollowers, 0), toStop(q.maxFollowers, F_STEPS)]);
+  useEffect(() => setRange([toStop(q.minFollowers, 0), toStop(q.maxFollowers, F_STEPS)]), [q.minFollowers, q.maxFollowers]);
+  const lo = range[0] <= 0 ? null : toFollowers(range[0]);
+  const hi = range[1] >= F_STEPS ? null : toFollowers(range[1]);
+  const followerText = lo == null && hi == null ? "Any"
+    : lo != null && hi != null ? `${compact(lo)} to ${compact(hi)}` : lo != null ? `${compact(lo)} or more` : `Up to ${compact(hi!)}`;
+
+  const pill = "press h-7 rounded-md border bg-card px-2 text-[13px] hover:border-foreground";
 
   return (
     <div>
-      <section className="pb-4">
-        <h2 className="mb-1.5 text-[13px] font-medium">Sort by</h2>
-        {SORTS.map(([key, label]) => (
-          <button key={key} className={cn(row, sort === key && "bg-muted font-medium")} aria-pressed={sort === key} onClick={() => onSort(key)}>
-            {label}{sort === key && <Check className="size-4" />}
-          </button>
-        ))}
-      </section>
-
       <Section title="Pipeline stage">
-        {STAGES.map((s) => {
-          const on = q.stages.includes(s);
-          return (
-            <button key={s} className={row} role="checkbox" aria-checked={on} onClick={() => onChange({ ...q, stages: toggle(q.stages, s) })}>
-              <span className="flex items-center gap-2.5">
-                <span className={cn("grid size-4 place-items-center rounded-[5px] border border-foreground/40", on && "border-primary bg-primary text-primary-foreground")}>
-                  {on && <Check className="size-3" strokeWidth={3} />}
-                </span>
-                {STAGE_NAME[s]}
-              </span>
-            </button>
-          );
-        })}
-        <p className="mt-1.5 px-2 text-[13px] text-muted-foreground">None ticked means roster first.</p>
+        {STAGES.map((s) => (
+          <Option key={s} label={STAGE_NAME[s]} count={facets[`stage:${s}`]} checked={q.stages.includes(s)} onToggle={() => onChange({ ...q, stages: toggle(q.stages, s) })} />
+        ))}
+        <p className="mt-1.5 text-[13px] leading-snug text-muted-foreground">With none ticked, the roster is searched first.</p>
       </Section>
 
       <Section title="Creator type">
-        <div className="flex flex-wrap gap-1.5">
-          {NICHES.map((n) => {
-            const on = q.niches.includes(n);
-            return (
-              <button
-                key={n} aria-pressed={on} onClick={() => onChange({ ...q, niches: toggle(q.niches, n) })}
-                className={cn(pill, on ? "border-primary bg-primary text-primary-foreground" : "bg-card hover:border-foreground")}
-              >
-                {n}
-              </button>
-            );
-          })}
+        {NICHES.map((n) => (
+          <Option key={n} label={n} count={facets[`niche:${n}`]} checked={q.niches.includes(n)} onToggle={() => onChange({ ...q, niches: toggle(q.niches, n) })} />
+        ))}
+      </Section>
+
+      <Section title="Gender">
+        {GENDERS.map((g) => (
+          <Option key={g} label={GENDER_NAME[g]} count={facets[`gender:${g}`]} checked={q.genders.includes(g)} onToggle={() => onChange({ ...q, genders: toggle(q.genders, g) })} />
+        ))}
+      </Section>
+
+      <Section title="Followers" value={followerText}>
+        <Slider
+          labels={["Fewest followers", "Most followers"]} min={0} max={F_STEPS} step={1} value={range}
+          onValueChange={(v) => setRange(v as number[])}
+          onValueCommitted={(v) => {
+            const [a, b] = v as number[];
+            onChange({ ...q, minFollowers: a <= 0 ? null : toFollowers(a), maxFollowers: b >= F_STEPS ? null : toFollowers(b) });
+          }}
+        />
+        <div className="mt-2.5 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-[13px] text-muted-foreground">
+          <Typed label="Followers from" placeholder="Min" value={q.minFollowers != null ? compact(q.minFollowers) : ""} onCommit={(t) => onChange({ ...q, minFollowers: parseCount(t) })} />
+          to
+          <Typed label="Followers to" placeholder="Max" value={q.maxFollowers != null ? compact(q.maxFollowers) : ""} onCommit={(t) => onChange({ ...q, maxFollowers: parseCount(t) })} />
         </div>
       </Section>
+
+      <MinSlider
+        title="Engagement rate" label="Minimum engagement rate" max={10} step={0.5} value={q.minEngagement}
+        onCommit={(v) => onChange({ ...q, minEngagement: v })}
+      />
+
+      <MinSlider
+        title="US audience" label="Minimum share of audience in the US" max={100} step={5} value={q.minAudienceUS}
+        hint="Where the followers are, not where the creator lives."
+        onCommit={(v) => onChange({ ...q, minAudienceUS: v == null ? null : Math.round(v) })}
+      />
 
       <Section title="Lives in">
         {q.locations.length > 0 && (
@@ -127,7 +187,7 @@ export function FilterPanel({ parsed: q, places, sort, onSort, onChange, onReset
             {q.locations.map((l) => (
               <button
                 key={`${l.field}-${l.value}`} aria-label={`Remove ${l.label}`}
-                className={cn(pill, "flex items-center gap-1 border-primary bg-primary pr-1.5 text-primary-foreground normal-case")}
+                className="press flex h-7 items-center gap-1 rounded-md bg-primary pr-1.5 pl-2 text-[13px] text-primary-foreground"
                 onClick={() => onChange({ ...q, locations: q.locations.filter((x) => x !== l) })}
               >
                 {l.label}<X className="size-3.5" />
@@ -136,54 +196,21 @@ export function FilterPanel({ parsed: q, places, sort, onSort, onChange, onReset
           </div>
         )}
         <Input
-          className="h-8 bg-card text-[14px]" value={place} placeholder="City, state or country" aria-label="Find a place"
+          className="h-8 rounded-md bg-card px-2 text-[14px]" value={place} placeholder="City, state or country" aria-label="Find a place"
           onChange={(e) => setPlace(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && suggestions[0]) { onChange({ ...q, locations: [...q.locations, suggestions[0]] }); setPlace(""); } }}
         />
         <div className="mt-2 flex flex-wrap gap-1.5">
           {suggestions.map((p) => (
-            <button key={p} className={cn(pill, "bg-card normal-case hover:border-foreground")} onClick={() => { onChange({ ...q, locations: [...q.locations, p] }); setPlace(""); }}>
-              {p}
-            </button>
+            <button key={p} className={pill} onClick={() => { onChange({ ...q, locations: [...q.locations, p] }); setPlace(""); }}>{p}</button>
           ))}
           {suggestions.length === 0 && <span className="text-[13px] text-muted-foreground">No creators there in this demo.</span>}
         </div>
       </Section>
 
-      <Section title="Followers">
-        <div className="flex items-center gap-2">
-          <Field label="Followers from" placeholder="Min" value={q.minFollowers != null ? compact(q.minFollowers) : ""} onCommit={(t) => onChange({ ...q, minFollowers: parseCount(t) })} />
-          <span className="text-[13px] text-muted-foreground">to</span>
-          <Field label="Followers to" placeholder="Max" value={q.maxFollowers != null ? compact(q.maxFollowers) : ""} onCommit={(t) => onChange({ ...q, maxFollowers: parseCount(t) })} />
-        </div>
-      </Section>
-
-      <Section title="Minimum engagement">
-        <Field
-          label="Minimum engagement rate" placeholder="Any" suffix="%" inputMode="decimal"
-          value={q.minEngagement != null ? String(q.minEngagement) : ""}
-          onCommit={(t) => { const v = parseFloat(t); onChange({ ...q, minEngagement: isFinite(v) && v > 0 ? Math.min(100, v) : null }); }}
-        />
-      </Section>
-
-      <Section title="Minimum US audience">
-        <Field
-          label="Minimum share of audience in the US" placeholder="Any" suffix="%" inputMode="decimal"
-          value={q.minAudienceUS != null ? String(q.minAudienceUS) : ""}
-          onCommit={(t) => { const v = parseFloat(t); onChange({ ...q, minAudienceUS: isFinite(v) && v > 0 ? Math.min(100, Math.round(v)) : null }); }}
-        />
-        <p className="mt-1.5 text-[13px] text-muted-foreground">Where the audience is, not where the creator lives.</p>
-      </Section>
-
       <Section title="Posts about">
-        <Field label="Topic the creator posts about" placeholder="e.g. energy drinks" value={q.semantic} onCommit={(t) => onChange({ ...q, semantic: t })} />
+        <Typed label="Topic the creator posts about" placeholder="e.g. energy drinks" value={q.semantic} onCommit={(t) => onChange({ ...q, semantic: t })} />
       </Section>
-
-      {active > 0 && (
-        <button className="press mb-2 h-8 w-full rounded-lg border bg-card text-[14px] hover:border-foreground" onClick={onReset}>
-          Clear {active} {active === 1 ? "filter" : "filters"}
-        </button>
-      )}
     </div>
   );
 }

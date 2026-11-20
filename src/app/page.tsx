@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Copy, Search } from "lucide-react";
+import { Copy, Keyboard, PanelLeftClose, Search, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { CreatorCard, compact, initials, money } from "@/components/CreatorCard";
 import { Button } from "@/components/ui/button";
@@ -10,17 +10,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { FilterChips, summarize, type FilterEdit } from "@/components/FilterChips";
-import { FilterPanel, SORTS, type Sort } from "@/components/FilterPanel";
+import { activeCount, FilterPanel, SORTS, type Sort } from "@/components/FilterPanel";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { QuickLook } from "@/components/QuickLook";
 import type { Creator, SearchResponse, SearchResult } from "@/lib/types";
 
-/** Offered in the empty search box; Tab accepts it. */
-const SUGGESTION = "Fitness creators who post about energy drinks";
-const EXAMPLES = [
-  "Fitness creators who post about energy drinks",
-  "Fitness creators in Florida who post about energy drinks",
-  "Skincare creators with a mostly US audience who post about sunscreen",
-  "Who on the roster is open to paid usage",
+const NO_FILTERS = { niches: [], locations: [], stages: [], genders: [], minFollowers: null, maxFollowers: null, minEngagement: null, minAudienceUS: null, semantic: "" };
+const PANEL = "casting.filters.v1";
+const KEYS: [string[], string][] = [
+  [["←", "→", "↑", "↓"], "Move between creators"], [["Space"], "Open or close quick look"], [["S"], "Shortlist the focused creator"],
+  [[",", "."], "Flip through photos"], [["/"], "Jump to the search box"], [["Esc"], "Close"],
 ];
 
 const PARSER_LABEL = { llm: "Read by the language model", rules: "Read by the rule parser", chips: "Filters edited by hand" };
@@ -67,6 +66,17 @@ export default function Page() {
   const [looking, setLooking] = useState(false);
   const [shortlist, setShortlist] = useState<Shortlist>({ brief: "", creators: [] });
   const [restored, setRestored] = useState(false);
+  // The filter panel starts open on a wide screen and closed on a narrow one, then remembers.
+  const [panel, setPanel] = useState(true);
+  useEffect(() => {
+    let saved: string | null = null;
+    try { saved = localStorage.getItem(PANEL); } catch { /* use the default */ }
+    setPanel(saved != null ? saved === "open" : window.matchMedia("(min-width: 1024px)").matches);
+  }, []);
+  const togglePanel = () => setPanel((open) => {
+    try { localStorage.setItem(PANEL, open ? "closed" : "open"); } catch { /* not remembered */ }
+    return !open;
+  });
 
   const input = useRef<HTMLInputElement>(null);
   const cards = useRef<(HTMLElement | null)[]>([]);
@@ -192,109 +202,123 @@ export default function Page() {
     />
   );
 
-  const grid = "grid grid-cols-[repeat(auto-fill,minmax(min(100%,224px),1fr))] gap-x-1.5 gap-y-5";
+  const grid = "grid grid-cols-[repeat(auto-fill,minmax(min(100%,220px),1fr))] gap-x-1 gap-y-4";
+  const parsed = data?.parsed ?? NO_FILTERS;
+  const active = activeCount(parsed);
 
   return (
     <div className="lg:flex">
-      <aside className="hidden w-[272px] shrink-0 border-r bg-secondary lg:block">
-        <div className="sticky top-0 flex h-screen flex-col">
-          <div className="flex h-14 shrink-0 items-center justify-between border-b px-5">
-            <span className="text-[16px] font-medium tracking-[-0.02em]">Casting</span>
-            <span className="text-[13px] text-muted-foreground">Demo data</span>
+      {panel && <div className="fixed inset-0 z-30 bg-foreground/30 lg:hidden" onClick={togglePanel} aria-hidden="true" />}
+      {panel && (
+        <aside aria-label="Filters" className="fixed inset-y-0 left-0 z-40 w-[280px] shrink-0 border-r bg-secondary lg:sticky lg:top-0 lg:z-auto lg:h-screen lg:w-[264px]">
+          <div className="flex h-full flex-col">
+            <div className="flex h-12 shrink-0 items-center justify-between border-b pr-2 pl-4">
+              <h2 className="text-[14px] font-medium">
+                Filters{active > 0 && <span className="ml-1.5 font-normal text-muted-foreground tabular-nums">{active}</span>}
+              </h2>
+              <div className="flex items-center">
+                {active > 0 && (
+                  <Button variant="ghost" size="sm" className="press h-7 px-2 text-[13px] text-muted-foreground" onClick={() => { setQuery(""); run({ query: "" }); }}>
+                    Clear all
+                  </Button>
+                )}
+                <Button variant="ghost" size="icon" className="press size-8 text-muted-foreground" aria-label="Hide filters" onClick={togglePanel}>
+                  <PanelLeftClose />
+                </Button>
+              </div>
+            </div>
+            {/* overscroll-contain: reaching the end of this list must not start scrolling the results. */}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <FilterPanel parsed={parsed} places={data?.places ?? []} facets={data?.facets ?? {}} onChange={(filters) => run({ filters })} />
+            </div>
           </div>
-          <div className="flex-1 overflow-y-auto px-5 pt-4 pb-6">
-            {data && (
-              <FilterPanel
-                parsed={data.parsed} places={data.places} sort={sort} onSort={setSort}
-                onChange={(filters) => run({ filters })}
-                onReset={() => { setQuery(""); run({ query: "" }); }}
-              />
-            )}
-            <section className="border-t pt-4">
-              <h2 className="mb-1.5 text-[13px] font-medium">Example briefs</h2>
-              {EXAMPLES.map((ex) => (
-                <button
-                  key={ex} onClick={() => { setQuery(ex); submit(ex); }}
-                  className="press block w-full rounded-lg px-2 py-1.5 text-left text-[13px] leading-snug text-muted-foreground hover:bg-muted hover:text-foreground"
-                >
-                  {ex}
-                </button>
-              ))}
-            </section>
-          </div>
-        </div>
-      </aside>
+        </aside>
+      )}
 
-      <main className="min-w-0 flex-1 px-4 pb-32 sm:px-6">
-        <div className="sticky top-0 z-20 -mx-4 border-b bg-background/90 px-4 backdrop-blur-md sm:-mx-6 sm:px-6">
-          <form className="flex h-14 items-center gap-3" onSubmit={(e) => { e.preventDefault(); submit(query); }}>
-            <span className="text-[16px] font-medium tracking-[-0.02em] lg:hidden">Casting</span>
-            <div className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border bg-card pr-1 pl-3 transition-[border-color] duration-150 focus-within:border-foreground">
+      <main className="min-w-0 flex-1 px-4 pb-28 sm:px-5">
+        <div className="sticky top-0 z-20 -mx-4 border-b bg-background/90 px-4 backdrop-blur-md sm:-mx-5 sm:px-5">
+          <form className="flex h-12 items-center gap-2" onSubmit={(e) => { e.preventDefault(); submit(query); }}>
+            <span className="mr-1 text-[15px] font-medium tracking-[-0.01em]">Casting</span>
+            {!panel && (
+              <Button type="button" variant="outline" size="sm" className="press h-8 gap-1.5 bg-card px-2.5 text-[13px]" onClick={togglePanel}>
+                <SlidersHorizontal className="size-3.5" />Filters{active > 0 && <span className="text-muted-foreground tabular-nums">{active}</span>}
+              </Button>
+            )}
+            <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg border bg-card pr-1 pl-2.5 transition-[border-color] duration-150 focus-within:border-foreground">
               <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
               <input
                 id="q" ref={input} value={query} autoFocus spellCheck={false} autoComplete="off"
-                aria-label="Describe the brief" placeholder={SUGGESTION}
-                className="h-full min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-muted-foreground/70"
+                aria-label="Describe the brief" placeholder="Describe who the brief needs, e.g. fitness creators who post about energy drinks"
+                className="h-full min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-muted-foreground/70"
                 onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  // Tab in the empty box accepts the suggestion instead of leaving the field.
-                  if (e.key === "Tab" && !e.shiftKey && !query) { e.preventDefault(); setQuery(SUGGESTION); }
-                }}
               />
-              {!query && <span className="hidden shrink-0 items-center gap-1.5 text-[13px] text-muted-foreground sm:flex"><Kbd>Tab</Kbd> to fill</span>}
-              <Button type="submit" size="sm" aria-busy={loading} className="press h-7 shrink-0 rounded-md px-2.5 text-[13px]">Search</Button>
+              <Button type="submit" size="sm" aria-busy={loading} className="press h-6 shrink-0 rounded-md px-2 text-[13px]">Search</Button>
             </div>
-          </form>
-
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pb-2.5">
-            <div className="flex min-h-8 min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5" aria-live="polite">
-              {first && <span className="font-medium">Loading the roster</span>}
-              {data && (
-                <span className="font-medium whitespace-nowrap">
-                  {data.offRoster.length > 0
-                    ? `${main.length} on the roster, ${off.length} not yet`
-                    : `${main.length} ${main.length === 1 ? "creator" : "creators"}`}
-                </span>
-              )}
-              {data && <FilterChips parsed={data.parsed} places={data.places} onChange={(filters) => run({ filters })} addClassName="lg:hidden" />}
-            </div>
-            <div className="flex items-center gap-3">
-              {data && loading && <span className="text-[13px] text-muted-foreground">Searching…</span>}
-              {data && !loading && hasFilters && (
-                <span className="hidden text-[13px] whitespace-nowrap text-muted-foreground xl:inline">
-                  {PARSER_LABEL[data.parser]}, {RANKER_LABEL[data.ranker]}, {data.tookMs} ms
-                </span>
-              )}
-              <div className="-mx-1 max-w-full overflow-x-auto px-1 [scrollbar-width:none] lg:hidden">
-                <ToggleGroup
-                  aria-label="Sort by" value={[sort]} spacing={1}
-                  onValueChange={(v) => { if (v[0]) setSort(v[0] as Sort); }}
-                  className="rounded-full border bg-card p-0.5"
-                >
-                  {SORTS.map(([key, label]) => (
-                    <ToggleGroupItem
-                      key={key} value={key}
-                      className="h-7 rounded-full px-3 text-[13px] font-normal text-muted-foreground hover:bg-transparent aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-                    >
-                      {label}
-                    </ToggleGroupItem>
+            <Popover>
+              <PopoverTrigger render={<Button type="button" variant="ghost" size="icon" className="press size-8 text-muted-foreground max-sm:hidden" aria-label="Keyboard shortcuts" />}>
+                <Keyboard />
+              </PopoverTrigger>
+              <PopoverContent align="end" sideOffset={8} className="w-72 gap-0 p-3 text-[13px]">
+                <p className="mb-2 font-medium">Keyboard</p>
+                <ul className="grid gap-1.5">
+                  {KEYS.map(([keys, what]) => (
+                    <li key={what} className="flex items-center justify-between gap-3 text-muted-foreground">
+                      {what}<span className="flex gap-1">{keys.map((k) => <Kbd key={k}>{k}</Kbd>)}</span>
+                    </li>
                   ))}
-                </ToggleGroup>
-              </div>
+                </ul>
+                <p className="mt-2.5 border-t pt-2.5 text-muted-foreground">Sweep the mouse across a photo to flip through a profile.</p>
+              </PopoverContent>
+            </Popover>
+          </form>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-3 pb-1">
+          <div className="flex min-h-7 min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5" aria-live="polite">
+            <h1 className="text-[15px] font-medium whitespace-nowrap">
+              {first && "Loading the roster"}
+              {data && (data.offRoster.length > 0
+                ? `${main.length} on the roster, ${off.length} not yet`
+                : `${main.length} ${main.length === 1 ? "creator" : "creators"}`)}
+            </h1>
+            {data && hasFilters && <FilterChips parsed={data.parsed} places={data.places} onChange={(filters) => run({ filters })} addClassName="hidden" />}
+            {data && loading && <span className="text-[13px] text-muted-foreground">Searching…</span>}
+          </div>
+          <div className="flex min-w-0 items-center gap-3">
+            {data && !loading && hasFilters && (
+              <span className="hidden text-[13px] whitespace-nowrap text-muted-foreground 2xl:inline">
+                {PARSER_LABEL[data.parser]}, {RANKER_LABEL[data.ranker]}, {data.tookMs} ms
+              </span>
+            )}
+            <div className="-mx-1 max-w-full overflow-x-auto px-1 [scrollbar-width:none]">
+              <ToggleGroup
+                aria-label="Sort by" value={[sort]} spacing={0}
+                onValueChange={(v) => { if (v[0]) setSort(v[0] as Sort); }}
+                className="rounded-lg border bg-card p-0.5"
+              >
+                {SORTS.map(([key, label]) => (
+                  <ToggleGroupItem
+                    key={key} value={key}
+                    className="h-6 rounded-md! px-2.5 text-[13px] font-normal text-muted-foreground hover:bg-transparent hover:text-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+                  >
+                    {label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
             </div>
           </div>
         </div>
 
         {error && (
           <div className="mt-12 max-w-md">
-            <h2 className="text-[20px] font-medium tracking-[-0.02em]">No answer from search</h2>
+            <h2 className="text-[17px] font-medium">No answer from search</h2>
             <p className="mt-1 text-muted-foreground">{error}</p>
           </div>
         )}
 
         {!error && !loading && data && all.length === 0 && (
           <div className="mt-12 max-w-md">
-            <h2 className="text-[20px] font-medium tracking-[-0.02em]">Nobody fits all of that</h2>
+            <h2 className="text-[17px] font-medium">Nobody fits all of that</h2>
             <p className="mt-1 text-pretty text-muted-foreground">
               Not on the roster, and not among applicants or prospects. Remove a filter to widen the search; the follower range and the topic are usually the tightest.
             </p>
@@ -302,45 +326,36 @@ export default function Page() {
         )}
 
         {first && (
-          <div className={cn(grid, "mt-3")} aria-hidden="true">
+          <div className={cn(grid, "mt-2")} aria-hidden="true">
             {Array.from({ length: 10 }, (_, i) => (
               <div key={i} className="p-2">
-                <Skeleton className="aspect-[4/5] rounded-[17px]" />
+                <Skeleton className="aspect-[4/5] rounded-xl" />
                 <Skeleton className="mt-4 h-4 w-3/5" /><Skeleton className="mt-2 h-3.5 w-4/5" /><Skeleton className="mt-4 h-8 w-full" />
               </div>
             ))}
           </div>
         )}
 
-        <div className={cn("transition-opacity duration-150", loading && "pointer-events-none opacity-50")}>
-          <div className={cn(grid, "mt-3")} ref={sheet}>{main.map((r, i) => card(r, i))}</div>
+        <div className={cn("-mx-2 transition-opacity duration-150", loading && "pointer-events-none opacity-50")}>
+          <div className={cn(grid, "mt-2")} ref={sheet}>{main.map((r, i) => card(r, i))}</div>
 
           {off.length > 0 && (
-            <section className="mt-10 border-t pt-6" aria-label="Not on the roster yet">
-              <h2 className="text-[18px] font-medium tracking-[-0.02em]">Not on the roster yet</h2>
-              <p className="mt-1 max-w-2xl text-pretty text-muted-foreground">
+            <section className="mx-2 mt-8 border-t pt-5" aria-label="Not on the roster yet">
+              <h2 className="text-[15px] font-medium">Not on the roster yet</h2>
+              <p className="mt-0.5 max-w-2xl text-[14px] text-pretty text-muted-foreground">
                 {main.length === 0 ? "Nobody on the roster fits this brief."
                   : `Only ${main.length} on the roster ${main.length === 1 ? "fits" : "fit"} this brief.`}
                 {" "}These applicants and prospects do. They have no agreed rate and would need signing first.
               </p>
-              <div className={cn(grid, "mt-4")}>{off.map((r, i) => card(r, main.length + i))}</div>
+              <div className={cn(grid, "-mx-2 mt-3")}>{off.map((r, i) => card(r, main.length + i))}</div>
             </section>
           )}
         </div>
 
-        <footer className="mt-14 border-t pt-5 text-[13px] text-muted-foreground">
-          <p className="hidden flex-wrap items-center gap-x-5 gap-y-2 sm:flex">
-            <span className="flex items-center gap-1"><Kbd>←</Kbd><Kbd>→</Kbd><Kbd>↑</Kbd><Kbd>↓</Kbd> move</span>
-            <span className="flex items-center gap-1"><Kbd>Space</Kbd> quick look</span>
-            <span className="flex items-center gap-1"><Kbd>S</Kbd> shortlist</span>
-            <span className="flex items-center gap-1"><Kbd>,</Kbd><Kbd>.</Kbd> flip photos</span>
-            <span className="flex items-center gap-1"><Kbd>/</Kbd> search</span>
-            <span>Sweep across a photo to flip through the profile</span>
-          </p>
-          <p className="mt-4 max-w-3xl text-pretty">
-            Every creator, number, post and comment here is fictional and made for this demo.
-            {all.some((r) => r.creator.images.length > 0) && " The photos and clips are AI-generated stand-ins; nobody in them is a real person."}
-            {all.some((r) => r.creator.images.length === 0) && " Frames with initials are placeholders for profiles with no photos yet."}
+        <footer className="mt-12 border-t pt-4 text-[13px] text-muted-foreground">
+          <p className="max-w-3xl text-pretty">
+            Demo data. Every creator, number, post and comment here is fictional.
+            {all.some((r) => r.creator.images.length > 0) && " The photos and clips are AI-generated; nobody in them is a real person."}
           </p>
         </footer>
       </main>
@@ -359,16 +374,19 @@ export default function Page() {
       {shortlist.creators.length > 0 && (
         <aside
           aria-label="Shortlist"
-          className="tray fixed bottom-4 left-1/2 z-40 flex w-[min(680px,calc(100%-24px))] -translate-x-1/2 items-center gap-3 rounded-2xl border bg-card py-2 pr-2 pl-3 shadow-[0_10px_36px_rgb(23_23_21/0.14)] lg:left-[calc(50%+136px)]"
+          className={cn(
+            "tray fixed bottom-4 left-1/2 z-40 flex w-[min(640px,calc(100%-24px))] -translate-x-1/2 items-center gap-3 rounded-xl border bg-card py-1.5 pr-1.5 pl-3 shadow-[0_8px_30px_rgb(23_23_21/0.14)]",
+            panel && "lg:left-[calc(50%+132px)]",
+          )}
         >
           <div className="flex shrink-0 -space-x-2 max-sm:hidden">
             {shortlist.creators.slice(0, 4).map((c) => (
-              <span key={c.id} className="grid size-8 place-items-center overflow-hidden rounded-full bg-muted text-[13px] ring-2 ring-card">
+              <span key={c.id} className="grid size-7 place-items-center overflow-hidden rounded-full bg-muted text-[12px] ring-2 ring-card">
                 {c.images[0] ? <img src={c.images[0]} alt="" className="size-full object-cover" /> : initials(c.name)}
               </span>
             ))}
           </div>
-          <p className="min-w-0 flex-1 truncate">
+          <p className="min-w-0 flex-1 truncate text-[14px]">
             <span className="font-medium">{shortlist.creators.length} shortlisted</span>
             <span className="hidden text-muted-foreground sm:inline">
               {" · "}{compact(shortlist.creators.reduce((s, c) => s + c.recentReach, 0))} reach
@@ -376,8 +394,8 @@ export default function Page() {
               {unsigned > 0 && ` · ${unsigned} to sign`}
             </span>
           </p>
-          <Button variant="ghost" className="press h-9 text-muted-foreground max-sm:px-2" onClick={() => setShortlist({ brief: "", creators: [] })}>Clear</Button>
-          <Button className="press h-9 gap-2 rounded-xl px-3.5" onClick={copyShortlist}><Copy /> Copy shortlist</Button>
+          <Button variant="ghost" size="sm" className="press h-8 text-[13px] text-muted-foreground" onClick={() => setShortlist({ brief: "", creators: [] })}>Clear</Button>
+          <Button size="sm" className="press h-8 gap-1.5 rounded-lg px-3 text-[13px]" onClick={copyShortlist}><Copy className="size-3.5" /> Copy shortlist</Button>
         </aside>
       )}
     </div>
