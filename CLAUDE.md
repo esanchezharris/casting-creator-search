@@ -54,9 +54,11 @@ three stages. It does not crawl social platforms for strangers.
   ranking uses per-post embeddings and quotes the closest post as the reason.
 - `src/app/api/search/route.ts`: `POST {query}` or `POST {filters}` (chips
   edited in the UI). Returns which parser and ranker actually ran.
-- `src/app/page.tsx`, `src/components/` (CreatorCard, QuickLook,
-  FilterChips): the UI. Scrub preview
-  maps pointer x-position over the photo to an image index.
+- `src/app/page.tsx` and `src/components/`: a dashboard. `FilterPanel` is the
+  sidebar (sort and every filter), `FilterChips` shows how the brief was read,
+  `CreatorCard` has the scrub preview (pointer x-position over the photo picks
+  the image), `QuickLook` is a modal laid out like a post: media on the left,
+  the post for that photo with likes and top comments on the right.
 - `scripts/`: Python, standard library only. Keep it that way.
 
 ## State of things
@@ -79,13 +81,13 @@ out); embeddings win on paraphrase but cannot return "nobody" and miss
 
 Photos and clips: AI-generated on Higgsfield (Soul 2.0 for the first
 portrait, Nano Banana Pro with that portrait as a reference for four more
-scenes, Kling 4.0 Flash for a 5-second clip with sound). Files live in
-`public/creators/<id>/` (`1.jpg` to `5.jpg`, optional `clip.mp4`) and
-`python3 scripts/apply_media.py` points `data/creators.json` at them; rerun it
-after `npm run seed`. As of 20 Nov only a pilot of 4 creators is done (Jade
-Santos with a clip, Valentina Vargas, Felix Thorne, Priya Hayashi); the other
-116 show placeholder frames until Emilio approves the pilot. The old Unsplash
-script (`scripts/fetch_images.py`) is no longer used.
+scenes, Kling 4.0 Flash for 5-second clips with sound). Prompts come from
+`scripts/media_prompts.py` (one hand-written scene per caption, a seeded look
+per creator). Files live in `public/creators/<id>/` (`1.jpg` to `5.jpg`,
+optional `clip.mp4`); `python3 scripts/apply_media.py` points
+`data/creators.json` at them and records which post each photo shows
+(`photoPosts`). Rerun it after `npm run seed`. Likes and top comments per post
+(`reactions`) come from the seed script.
 
 UI: rebuilt on Tailwind 4 and shadcn (Base UI flavour) on 20 Nov. Components
 are in `src/components/ui`. Emil Kowalski's skills are installed in
@@ -103,8 +105,11 @@ Port 3000 is often taken on Emilio's machine. `npx next dev --port 3210` and
 ## Design rules
 The palette reference is `docs/reference/questionnaire.png`, a screen from
 the agency's own applicant questionnaire. Emilio rejected a dark serif version as
-over-styled, and a second version (mono-caps buttons, key badges on every
-card) as looking vibe coded. The bar is a clean shadcn product UI.
+over-styled, a second version (mono-caps buttons, key badges on every card)
+as vibe coded, and a third (big centred headline over a search box) as a
+consumer landing page. It is an internal tool: a dense dashboard with the
+controls always visible. No marketing headlines, no cute copy; labels say
+what a control does.
 Readability beats style every time.
 
 - Use the shadcn components in `src/components/ui` before writing anything by
@@ -113,10 +118,11 @@ Readability beats style every time.
 - Warm paper ground (#edeae4), white surfaces, 1px warm-grey borders.
 - One sans family (Geist). Headings are weight 500 with tight tracking, never
   bold, never serif. No mono capitals.
-- Cards are image-first with no chrome until focused. "Selected" is a solid
+- Cards are image-first with no chrome until the mouse or the arrow keys are
+  on them, and the highlight leaves with the mouse. "Selected" is a solid
   black fill with a check.
-- Exactly one accent: the small red dot beside the wordmark. No gradients.
-  The shortlist bar has the only real shadow.
+- No accent colour in the chrome and no logo mark; the wordmark is plain
+  text. No gradients. The shortlist bar has the only real shadow.
 - Motion follows `.agents/skills/emil-design-eng`: pressables scale to 0.97,
   popovers grow from their trigger, nothing that follows the keyboard or the
   pointer (scrub, arrow keys, quick look) animates.

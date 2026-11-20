@@ -14,8 +14,9 @@ The LLM is not perfectly repeatable, so run each brief once before recording.
 ## Before you record
 
 - `npm run dev`, open the page at 1440px wide, clear any old shortlist.
-- Seven profiles have photos; the rest show initials and "1 of 5". In the
-  first brief the first, sixth and last cards have photos. Sweep those.
+- Every profile has five AI-generated photos, and the creators these briefs
+  surface also have a short clip in quick look. The clip starts muted; the
+  speaker button on it turns the sound on.
 - Have `docs/EVAL.md` open in a second tab at "Results, final code".
 - Pressing Enter in the search box hands the keyboard to the grid, so the
   shortcuts in shot 4 work straight away.
@@ -39,17 +40,18 @@ the chips as they appear, then at "9 creators".
 
 **3. Sweep a card (0:28 to 0:40)**
 
-Move the pointer slowly left to right across the first card's photo (Lucia
-Rossi), then across the sixth (Camila Thorne).
+Move the pointer slowly left to right across the first card's photo, then
+across another.
 
 > "Sweeping across a photo flips through the profile without opening it. Under
 > it: recent reach, engagement, US audience, and the rate we have agreed. The
-> people and numbers are fictional."
+> people are fictional and the photos are generated."
 
 **4. Keyboard shortlist and copy (0:40 to 0:58)**
 
 Press Right, `S`. Arrow to the last card (Jade Santos) and pause on its
-warning. Press Space to open quick look, Esc to close. Click "Copy shortlist".
+warning. Press Space to open quick look (the clip plays muted, with the post
+and its top comments beside it), Esc to close. Click "Copy shortlist".
 
 > "Arrow keys move, S shortlists. This last creator posts about energy drinks,
 > but the notes say they are exclusive with an energy drink brand until March,
