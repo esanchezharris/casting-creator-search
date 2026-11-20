@@ -30,15 +30,17 @@ the LLM parser and the embedding ranker have still never been executed.
 | 1. After the pipeline model (Phase 0) | rules + keywords | 21 | 19/21 | 0.98 (12 queries) | 0.90 | 1/1 |
 | 2. Hard cases added, no fixes yet | rules + keywords | 46 | 35/46 | 0.78 (24 queries) | 0.73 | 4/4 |
 | 3. Parser fixes | rules + keywords | 46 | 46/46 | 0.83 | 0.79 | 4/4 |
-| 4. Keyword relevance cutoff at 0.5 | rules + keywords | 46 | 46/46 | 0.88 | 0.78 | 4/4 |
-| 5. Held-out cases, written after the fixes | rules + keywords | 10 | 7/10 | 0.90 (5 queries) | 0.80 | 0/1 |
+| 4. Ranking fixes (current) | rules + keywords | 46 | 46/46 | 0.88 | 0.77 | 4/4 |
+| 5. Held-out cases (current) | rules + keywords | 10 | 7/10 | 0.80 (5 queries) | 0.80 | 0/1 |
+| All 56 cases (current) | rules + keywords | 56 | 53/56 | 0.86 (29 queries) | 0.77 | 4/5 |
 | LLM parser | llm + keywords | not run | | | | |
 | LLM parser, embedding ranker | llm + embeddings | not run | | | | |
 
 Rows 1 to 4 are the same code path at four points in time, so they show what
 each change did. Row 4 is the current state on the 46 cases the fixes were
-developed against. Row 5 is the honest one: ten queries written afterwards and
-never tuned on. Read 46/46 as "the regression set passes", not as accuracy.
+developed against: read 46/46 as "the regression set passes", not as accuracy.
+Row 5 is ten queries written after the parser fixes and never used to tune the
+parser. It is the more honest number, with one caveat spelled out below.
 
 ## What each step fixed
 
@@ -52,12 +54,24 @@ quarter million plus", "between fifty and a hundred thousand", "no more than
 known word within one edit, two for long words ("fitnes creaters in Flordia",
 "sunscrean").
 
-**Step 3 to 4, ranking.** Keyword ranking used to return anyone who matched a
-single word. Those weak matches counted as roster matches, pushed the roster
-past five and hid the applicants who actually fit. Dropping results under half
-the best score raised P@5 from 0.83 to 0.88 for one point of recall. The
-threshold was picked by running the eval at 0, 0.3, 0.4, 0.5 and 0.6; at 0.6
-recall fell to 0.60.
+**Step 3 to 4, ranking.** Three changes. Keyword ranking used to return anyone
+who matched a single word; those weak matches counted as roster matches,
+pushed the roster past five and hid the applicants who actually fit. Results
+under half the best score are now dropped. The threshold was picked by running
+the eval at 0, 0.3, 0.4, 0.5 and 0.6: P@5 rose from 0.83 to 0.88 up to 0.5 with
+recall about flat, and at 0.6 recall fell to 0.65. Second, conflict notes no
+longer count toward the score. "Exclusive with an energy drink brand" was
+making a creator the top match for an energy drink brief, which is backwards;
+it now produces a warning on the card and halves the score. Third, a stage
+filter is applied before the cutoff instead of after.
+
+**The held-out caveat.** The held-out set first scored P@5 0.90, recall 0.80.
+Taking conflict notes out of the score dropped it to 0.70 and 0.70, because
+"prospects who review protein powder" started returning nobody: the cutoff was
+being measured against a roster creator the query had excluded. That was a
+real bug and fixing it (the third change above) brought the set to 0.80 and
+0.80. So one ranking fix was prompted by a held-out query. No parser rule was
+changed for the held-out set, and its three parser misses are still misses.
 
 ## What still fails
 
@@ -87,6 +101,11 @@ Held-out parser misses, left unfixed on purpose:
   known way to say "or more", so 500000 ends up in the topic text.
 - "makeup tutorials from creators in Chicago": nobody in Chicago posts about
   makeup, but one creator is returned for the word "tutorial".
+
+Partial misses: "fitness creators who post about running"
+finds 3 of 6 (posts say "long run" and "tempo run", the query says "running",
+and the stemmer does not connect them), and the held-out "anyone under 20k who posts thrift hauls" returns
+two creators of whom only one mentions thrifting.
 
 Other limits worth knowing:
 

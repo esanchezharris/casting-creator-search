@@ -7,9 +7,9 @@ import { QuickLook } from "@/components/QuickLook";
 import type { Creator, SearchResponse, SearchResult } from "@/lib/types";
 
 const EXAMPLES = [
-  "Fitness creators in Florida under 100K who post about energy drinks",
-  "Beauty creators with a mostly US audience and engagement over 5%",
-  "Signed creators in Texas who post about sunscreen",
+  "Fitness creators who post about energy drinks",
+  "Fitness creators in Florida who post about energy drinks",
+  "Skincare creators with a mostly US audience who post about sunscreen",
   "Runners who review shoes",
 ];
 
@@ -161,6 +161,11 @@ export default function Page() {
     return () => window.removeEventListener("keydown", onKey);
   }, [all, focus, toggle]);
 
+  // Opening the panel narrows the grid, so bring the focused card back into view.
+  useEffect(() => {
+    if (looking && focus >= 0) cards.current[focus]?.scrollIntoView({ block: "nearest" });
+  }, [looking, focus]);
+
   const copyShortlist = async () => {
     try {
       await navigator.clipboard.writeText(shortlistText(shortlist));
@@ -170,6 +175,9 @@ export default function Page() {
     }
     setTimeout(() => setCopied(""), 1600);
   };
+
+  // Searching hands the keyboard to the grid, so arrows and S work without a click.
+  const submit = (text: string) => { input.current?.blur(); run({ query: text }); };
 
   const signed = shortlist.creators.filter((c) => c.rate != null);
   const unsigned = shortlist.creators.length - signed.length;
@@ -197,20 +205,20 @@ export default function Page() {
         <span className="label">Demo data · fictional creators</span>
       </header>
 
-      <form className="ask" onSubmit={(e) => { e.preventDefault(); run({ query }); }}>
+      <form className="ask" onSubmit={(e) => { e.preventDefault(); submit(query); }}>
         <h1><label htmlFor="q">Who does the brief need?</label></h1>
         <p>Describe them in a sentence. The roster is searched first; if it is thin, you also see who would be worth signing.</p>
         <div className="ask-box">
           <textarea
             id="q" ref={input} rows={1} value={query} autoFocus spellCheck={false}
-            placeholder="Fitness creators in Florida under 100K who post about energy drinks"
+            placeholder="Fitness creators who post about energy drinks"
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); run({ query }); } }}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(query); } }}
           />
           <button className="go" type="submit" aria-busy={loading}>Search</button>
         </div>
         <div className="examples">
-          {EXAMPLES.map((ex) => <button type="button" key={ex} onClick={() => { setQuery(ex); run({ query: ex }); }}>{ex}</button>)}
+          {EXAMPLES.map((ex) => <button type="button" key={ex} onClick={() => { setQuery(ex); submit(ex); }}>{ex}</button>)}
         </div>
       </form>
 

@@ -40,13 +40,13 @@ three stages. It does not crawl social platforms for strangers.
 ## Commands
     npm run dev      # http://localhost:3000
     npm run build    # must pass before you call anything done
-    npm run seed     # regenerate data/creators.json (120 fictional creators)
+    npm run seed     # regenerate data/creators.json (120 fictional creators, seed 11)
     npm run embed    # needs OPENAI_API_KEY; writes data/embeddings.json
     npm run eval     # needs the app running; prints parser + P@5 scores
 
 ## How it works
-- `src/lib/parse.ts`: query -> `ParsedQuery` (niches, locations, follower
-  range, min engagement, free-text `semantic`). Two parsers: deterministic
+- `src/lib/parse.ts`: query -> `ParsedQuery` (niches, locations, stages,
+  follower range, min engagement, min US audience, free-text `semantic`). Two parsers: deterministic
   rules (always available) and an LLM call with JSON output. LLM output goes
   through `sanitize()` and falls back to rules on any error.
 - `src/lib/search.ts`: hard filters, then ranking. Keyword ranking (idf with a
@@ -54,23 +54,33 @@ three stages. It does not crawl social platforms for strangers.
   ranking uses per-post embeddings and quotes the closest post as the reason.
 - `src/app/api/search/route.ts`: `POST {query}` or `POST {filters}` (chips
   edited in the UI). Returns which parser and ranker actually ran.
-- `src/app/page.tsx`, `src/components/CreatorCard.tsx`: the UI. Scrub preview
+- `src/app/page.tsx`, `src/components/` (CreatorCard, QuickLook,
+  FilterChips): the UI. Scrub preview
   maps pointer x-position over the photo to an image index.
 - `scripts/`: Python, standard library only. Keep it that way.
 
 ## State of things
-Verified working: build, rule parser, keyword ranking, chips, scrub preview,
-shortlist, keyboard nav, eval script (baseline 13/15 filters, P@5 0.91).
+Verified working (20 Nov 2026, rule parser + keyword ranking, no keys): build,
+pipeline model (stage, partner, audience, reach, notes, roster-only rate),
+roster-first grouping, chips with editors and "Add filter", scrub preview,
+quick look, shortlist with localStorage and copy text, keyboard nav, eval with
+recall and a held-out set. Numbers and known misses are in docs/EVAL.md
+(tuned 46/46 filters, P@5 0.88, recall 0.77; held out 7/10, 0.80, 0.80).
 
-Not built yet: the pipeline model above. The data has no stage, audience
-location, reach, notes or talent partner. PROMPT.md Phase 0 adds them.
+Checked in a browser at 1440px and 390px. Not checked: touch drag on a real
+touch screen, and photo preloading (there are no photos to load).
 
-Never run (no API keys were available when written), so expect bugs:
+Never run (no API keys were available), so expect bugs:
 - `parseWithLLM` in `src/lib/parse.ts`
-- `rankByEmbeddings` in `src/lib/search.ts` and `scripts/embed.py`
-- `scripts/fetch_images.py` (Pexels)
+- `rankByEmbeddings` in `src/lib/search.ts` and `scripts/embed.py`. It also
+  has no relevance cutoff yet; the keyword ranker does (KEYWORD_CUTOFF).
+- `scripts/fetch_images.py` (Pexels, which stopped issuing keys). Every
+  creator has `images: []` and the UI draws placeholder frames.
 Default model names in `.env.example` may be out of date. Check the provider's
 current docs before assuming a name is valid.
+
+Port 3000 is often taken on Emilio's machine. `npx next dev --port 3210` and
+`npm run eval -- --url http://localhost:3210` work.
 
 ## Design rules
 The reference is `docs/reference/questionnaire.png`, a screen from the agency's

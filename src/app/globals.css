@@ -277,6 +277,8 @@ kbd {
 @media (max-width: 1100px) { .tray .names { display: none; } .tray .clear { margin-left: auto; } }
 @media (max-width: 640px) {
   .ask-box { flex-direction: column; }
+  /* In a column the flex basis would override the measured height and clip long briefs. */
+  .ask-box textarea { flex: none; font-size: 18px; }
   .masthead .label { text-align: right; }
   .toolbar { flex-direction: column; align-items: stretch; }
   .tray { bottom: 10px; padding: 8px 8px 8px 16px; gap: 12px; }

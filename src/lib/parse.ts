@@ -53,7 +53,11 @@ export const PLACES: string[] = [...new Set(GAZETTEER.map(([, f]) => f.label))].
 export function resolveLocation(text: string): LocationFilter | null {
   const t = text.trim().toLowerCase();
   const hit = GAZETTEER.find(([term]) => term === t);
-  return hit ? hit[1] : null;
+  if (hit) return hit[1];
+  // The model tends to pass a misspelled place through unchanged ("Flordia").
+  const names = GAZETTEER.filter(([term, f]) => term === f.label.toLowerCase());
+  const near = closest(t, names.map(([term]) => term));
+  return near ? names.find(([term]) => term === near)![1] : null;
 }
 
 // ------------------------------------------------------------ rule parser
@@ -106,7 +110,7 @@ const FILLER = new Set(("a an the and or of in on at to for from with who whos t
   "followers follower following audience has have having their them they i want need looking some any " +
   "whose us we our show list get please brief campaign launch yet already currently").split(" "));
 
-const NUM = String.raw`(\d+(?:[.,]\d+)?)\s*(k|m|thousand|million)?`;
+const NUM = String.raw`(\d+(?:[.,]\d+)?)\s*((?:thousand|million|k|m)(?![a-z]))?`;
 
 function toNumber(n: string, suffix?: string): number {
   const v = parseFloat(n.replace(",", suffix ? "." : ""));
@@ -240,13 +244,18 @@ export function parseWithRules(query: string): ParsedQuery {
 
 const SYSTEM = `You turn a casting request for social media creators into JSON filters.
 Return only a JSON object with these keys:
-- "niches": array, each one of ${JSON.stringify(NICHES)}. Include a niche only when the request asks for that TYPE of creator ("fitness creators"). A topic they post about ("running shoes") is not a niche.
+- "niches": array, each one of ${JSON.stringify(NICHES)}. Include a niche only when the request names that TYPE of creator ("fitness creators", "foodies", "yogis"). A topic they post about is not a niche, and you must not infer a niche from the topic.
 - "locations": array of place names exactly as a person would write them (city, US state, or country). Empty if none.
-- "minFollowers", "maxFollowers": integers or null. "micro" means 10000-100000, "nano" means under 10000, "macro" means over 500000.
+- "minFollowers", "maxFollowers": integers or null. "micro" means 10000-100000, "nano" means under 10000, "macro" means over 500000. Leave both null unless the request states a size; never guess one.
 - "minEngagement": number (percent) or null.
 - "stages": array, each one of ["roster","applicant","prospect"]. Empty unless the request says so. "signed" or "on the roster" means ["roster"]. "applicants" means ["applicant"]. "prospects" means ["prospect"]. "not signed yet" or "worth signing" means ["applicant","prospect"].
 - "minAudienceUS": number 0-100 or null. The minimum share of the creator's AUDIENCE that is in the US. "US audience" or "mostly American followers" with no number means 50. This is about followers, not where the creator lives: "in Florida" is a location, not an audience filter.
-- "semantic": the topic, product or vibe to match against their posts, as a short phrase. Empty string if the request is filters only. It is matched against post captions and CRM notes, so "open to paid usage" or "delivers early" belong here. Never repeat a niche, place, stage or number here.`;
+- "semantic": the topic, product or vibe to match against their posts, as a short phrase. Empty string if the request is filters only. It is matched against post captions and CRM notes, so "open to paid usage" or "delivers early" belong here. Never repeat a niche, place, stage or number here.
+
+Examples:
+"micro foodies in Chicago with a mostly US audience who post about air fryers" -> {"niches":["food"],"locations":["Chicago"],"stages":[],"minFollowers":10000,"maxFollowers":100000,"minEngagement":null,"minAudienceUS":50,"semantic":"air fryers"}
+"applicants who post about trail shoes" -> {"niches":[],"locations":[],"stages":["applicant"],"minFollowers":null,"maxFollowers":null,"minEngagement":null,"minAudienceUS":null,"semantic":"trail shoes"}
+"a snack for after the gym" -> {"niches":[],"locations":[],"stages":[],"minFollowers":null,"maxFollowers":null,"minEngagement":null,"minAudienceUS":null,"semantic":"a snack for after the gym"}`;
 
 export const llmConfigured = () => !!process.env.OPENAI_API_KEY;
 
@@ -289,13 +298,27 @@ export async function parseWithLLM(query: string): Promise<ParsedQuery> {
     body: JSON.stringify({
       model: process.env.LLM_MODEL ?? "gpt-4o-mini",
       response_format: { type: "json_object" },
+      temperature: 0,
       messages: [{ role: "system", content: SYSTEM }, { role: "user", content: query }],
     }),
     signal: AbortSignal.timeout(8000),
   });
   if (!res.ok) throw new Error(`LLM parser HTTP ${res.status}`);
   const data = await res.json();
-  return sanitize(JSON.parse(data.choices[0].message.content));
+  const parsed = sanitize(JSON.parse(data.choices[0].message.content));
+  // Cross-check: the model sometimes returns filters and forgets the topic. If the rule parser
+  // found one in the same sentence, keep it rather than silently searching on filters alone.
+  const rules = parseWithRules(query);
+  if (!parsed.semantic) parsed.semantic = rules.semantic;
+  // Numbers are where the model slips ("50K+" came back as 500000) and where the rules are
+  // exact. When the rules read a figure out of the sentence, theirs wins.
+  for (const key of ["minFollowers", "maxFollowers", "minEngagement", "minAudienceUS"] as const) {
+    if (rules[key] != null && rules[key] !== parsed[key]) {
+      console.warn(`LLM parser: ${key} ${parsed[key]} replaced by ${rules[key]} from the rule parser`);
+      parsed[key] = rules[key];
+    }
+  }
+  return parsed;
 }
 
 /** LLM when configured, rules otherwise or on any failure. */

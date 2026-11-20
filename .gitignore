@@ -6,3 +6,4 @@ node_modules
 next-env.d.ts
 __pycache__
 .claude
+data/unsplash_cache.json

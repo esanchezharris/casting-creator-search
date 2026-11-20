@@ -33,12 +33,18 @@ def main() -> None:
     creators = json.loads((ROOT / "data" / "creators.json").read_text())
     texts, owners = [], []
     for c in creators:
+        # Same notes as keyword ranking (searchableNotes in src/lib/search.ts): how they work,
+        # not conflicts or pipeline status. Order matters: vectors are matched to notes by index.
+        notes = [n["text"] for n in c["notes"] if n["kind"] in ("reliability", "terms")]
         texts.append(f"{c['bio']} Niches: {', '.join(c['niches'])}. " + " ".join(c["captions"])
-                     + " Notes: " + " ".join(n["text"] for n in c["notes"]))
+                     + " Notes: " + " ".join(notes))
         owners.append((c["id"], "doc"))
         for cap in c["captions"]:
             texts.append(cap)
-            owners.append((c["id"], "caption"))
+            owners.append((c["id"], "captions"))
+        for note in notes:
+            texts.append(note)
+            owners.append((c["id"], "notes"))
 
     vectors = []
     for i in range(0, len(texts), 200):
@@ -47,12 +53,12 @@ def main() -> None:
 
     items: dict = {}
     for (cid, kind), vec in zip(owners, vectors):
-        entry = items.setdefault(cid, {"doc": None, "captions": []})
+        entry = items.setdefault(cid, {"doc": None, "captions": [], "notes": []})
         vec = [round(x, 5) for x in vec]
         if kind == "doc":
             entry["doc"] = vec
         else:
-            entry["captions"].append(vec)
+            entry[kind].append(vec)
 
     out = ROOT / "data" / "embeddings.json"
     out.write_text(json.dumps({"model": MODEL, "dims": DIMS, "items": items}))
