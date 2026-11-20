@@ -7,6 +7,7 @@ export const creators = creatorsJson as Creator[];
 
 // ------------------------------------------------------------------ filters
 
+/** Every hard filter except stage, which search() handles so it can put the roster first. */
 export function applyFilters(q: ParsedQuery): Creator[] {
   return creators.filter((c) => {
     if (q.niches.length && !q.niches.some((n) => c.niches.includes(n))) return false;
@@ -14,6 +15,7 @@ export function applyFilters(q: ParsedQuery): Creator[] {
     if (q.minFollowers != null && c.followers < q.minFollowers) return false;
     if (q.maxFollowers != null && c.followers > q.maxFollowers) return false;
     if (q.minEngagement != null && c.engagement < q.minEngagement) return false;
+    if (q.minAudienceUS != null && c.audience.us < q.minAudienceUS) return false;
     return true;
   });
 }
@@ -24,7 +26,8 @@ const STOP = new Set("a an the and or of in on at to for with my i it is that th
 const stem = (w: string) => (w.length > 3 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w);
 const tokens = (s: string) => s.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w && !STOP.has(w)).map(stem);
 
-const docTokens = new Map(creators.map((c) => [c.id, tokens([c.bio, ...c.captions].join(" "))]));
+// Notes are searchable alongside the bio and posts ("open to paid usage", "delivered early").
+const docTokens = new Map(creators.map((c) => [c.id, tokens([c.bio, ...c.captions, ...c.notes.map((n) => n.text)].join(" "))]));
 const df = new Map<string, number>();
 for (const toks of docTokens.values()) for (const t of new Set(toks)) df.set(t, (df.get(t) ?? 0) + 1);
 const idf = (t: string) => Math.log(1 + creators.length / (1 + (df.get(t) ?? 0)));
@@ -46,16 +49,23 @@ function rankByKeywords(pool: Creator[], semantic: string): SearchResult[] {
     const covered = q.filter((t) => toks.includes(t)).length;
     score *= q.length ? covered / q.length : 0;
 
-    const perCaption = creator.captions.map((cap) => {
-      const ct = tokens(cap);
-      return { cap, hits: q.filter((t) => ct.includes(t)).length };
-    });
-    const matching = perCaption.filter((p) => p.hits > 0).sort((a, b) => b.hits - a.hits);
-    const reason = matching.length
-      ? `${matching.length} of ${creator.captions.length} recent posts match: “${clip(matching[0].cap)}”`
+    const hitsIn = (text: string) => { const tt = tokens(text); return q.filter((t) => tt.includes(t)).length; };
+    const posts = creator.captions.map((cap, i) => ({ i, cap, hits: hitsIn(cap) })).filter((p) => p.hits > 0).sort((a, b) => b.hits - a.hits);
+    const notes = creator.notes.map((n) => ({ text: n.text, hits: hitsIn(n.text) })).filter((n) => n.hits > 0).sort((a, b) => b.hits - a.hits);
+    // Quote whichever matched more of the query: a post, or a CRM note.
+    const noteWins = notes.length > 0 && (!posts.length || notes[0].hits > posts[0].hits);
+    const reason = noteWins ? `CRM note: “${clip(notes[0].text)}”`
+      : posts.length ? `${posts.length} of ${creator.captions.length} recent posts match: “${clip(posts[0].cap)}”`
       : null;
-    return { creator, score, reason };
+    return { creator, score, reason, matchedPost: posts.length ? posts[0].i : null, warning: null };
   });
+}
+
+/** A conflict note is worth a warning when what it covers overlaps the topic being searched. */
+function conflictFor(creator: Creator, semantic: string): string | null {
+  const q = new Set(tokens(semantic));
+  const hit = creator.notes.find((n) => n.kind === "conflict" && tokens(n.about ?? n.text).some((t) => q.has(t)));
+  return hit ? hit.text : null;
 }
 
 // ----------------------------------------------------- embedding ranking
@@ -100,33 +110,57 @@ async function rankByEmbeddings(pool: Creator[], semantic: string): Promise<Sear
   const q = await embedQuery(semantic, file);
   return pool.map((creator) => {
     const item = file.items[creator.id];
-    if (!item) return { creator, score: 0, reason: null };
+    if (!item) return { creator, score: 0, reason: null, matchedPost: null, warning: null };
     const sims = item.captions.map((v) => cosine(q, v));
     const best = sims.indexOf(Math.max(...sims));
     // Best single post carries most of the weight; the whole profile breaks ties.
     const score = 0.7 * sims[best] + 0.3 * cosine(q, item.doc);
-    return { creator, score, reason: `Closest post: “${clip(creator.captions[best])}”` };
+    return { creator, score, reason: `Closest post: “${clip(creator.captions[best])}”`, matchedPost: best, warning: null };
   });
 }
 
 // ------------------------------------------------------------------ search
 
-export async function search(q: ParsedQuery): Promise<{ results: SearchResult[]; ranker: "embeddings" | "keywords" | "followers" }> {
-  const pool = applyFilters(q);
-  const byFollowers = () => pool
-    .map((creator) => ({ creator, score: 0, reason: null }))
-    .sort((a, b) => b.creator.followers - a.creator.followers);
+/** Below this many roster matches, applicants and prospects who fit are returned as a second group. */
+export const ROSTER_MIN = 5;
 
-  if (!q.semantic.trim()) return { results: byFollowers(), ranker: "followers" };
+type Ranker = "embeddings" | "keywords" | "reach";
 
+async function rank(pool: Creator[], semantic: string): Promise<{ ranked: SearchResult[]; ranker: Ranker }> {
+  if (!semantic.trim()) {
+    // No topic: best photo sets first (this is the first screen of the demo), then recent reach.
+    const ranked = pool
+      .map((creator) => ({ creator, score: 0, reason: null, matchedPost: null, warning: null }))
+      .sort((a, b) => b.creator.images.length - a.creator.images.length || b.creator.recentReach - a.creator.recentReach);
+    return { ranked, ranker: "reach" };
+  }
+  let ranked: SearchResult[] | null = null;
+  let ranker: Ranker = "keywords";
   if (embeddingsReady() && process.env.RANKER !== "keywords") {
     try {
-      const results = (await rankByEmbeddings(pool, q.semantic)).sort((a, b) => b.score - a.score);
-      return { results, ranker: "embeddings" };
+      ranked = await rankByEmbeddings(pool, semantic);
+      ranker = "embeddings";
     } catch (e) {
       console.warn("embedding ranker failed, using keywords:", e);
     }
   }
-  const results = rankByKeywords(pool, q.semantic).filter((r) => r.score > 0).sort((a, b) => b.score - a.score);
-  return { results, ranker: "keywords" };
+  ranked ??= rankByKeywords(pool, semantic).filter((r) => r.score > 0);
+  for (const r of ranked) {
+    r.warning = conflictFor(r.creator, semantic);
+    // A creator who cannot take the brief should not outrank one who can.
+    if (r.warning) r.score *= 0.5;
+  }
+  ranked.sort((a, b) => b.score - a.score || b.creator.recentReach - a.creator.recentReach);
+  return { ranked, ranker };
+}
+
+export async function search(q: ParsedQuery): Promise<{ results: SearchResult[]; offRoster: SearchResult[]; ranker: Ranker }> {
+  const { ranked, ranker } = await rank(applyFilters(q), q.semantic);
+  if (q.stages.length)
+    return { results: ranked.filter((r) => q.stages.includes(r.creator.stage)), offRoster: [], ranker };
+
+  // Roster first. Only when the roster is thin do we show who would be worth signing.
+  const results = ranked.filter((r) => r.creator.stage === "roster");
+  const offRoster = results.length < ROSTER_MIN ? ranked.filter((r) => r.creator.stage !== "roster") : [];
+  return { results, offRoster, ranker };
 }

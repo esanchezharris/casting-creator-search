@@ -1,9 +1,14 @@
 """Generate data/creators.json: fictional creators for the search demo.
 
 Everything here is synthetic. Names, handles, stats and captions are invented;
-images are placeholders until you run fetch_images.py.
+photos are empty until you run fetch_images.py (the UI draws placeholders).
 
-    python3 scripts/seed.py            # 120 creators, deterministic
+Each record mirrors how a creator agency keeps talent: a pipeline stage
+(roster, applicant, prospect), a talent partner and agreed rate for roster
+creators only, audience location separate from where the creator lives, and
+short CRM notes.
+
+    python3 scripts/seed.py            # 120 creators, deterministic (seed 11)
     python3 scripts/seed.py --n 300
 """
 import argparse
@@ -166,19 +171,67 @@ TAGLINES = {
 PRIMARY = (["fitness"] * 10 + ["beauty"] * 8 + ["fashion"] * 8 + ["skincare"] * 6 + ["running"] * 6 +
            ["hair"] * 5 + ["streetwear"] * 5 + ["wellness"] * 5 + ["lifestyle"] * 4 + ["food"] * 3)
 
+PARTNERS = ["Marisol", "Jonah", "Bea", "Tariq", "Wren"]  # fictional talent partners
 
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--n", type=int, default=120)
-    ap.add_argument("--seed", type=int, default=7)
-    args = ap.parse_args()
-    rnd = random.Random(args.seed)
+OTHER_MARKETS = ["United Kingdom", "Brazil", "India", "Canada", "Mexico", "Germany", "Australia", "Philippines"]
+
+RELIABILITY = [
+    "Delivered two days early on the last campaign.",
+    "Hit every deadline so far.",
+    "Needed one reminder on drafts; the final cut was on brief.",
+    "Turns revisions around within 24 hours.",
+    "Missed a posting date once in the spring, flagged it early and made it up.",
+    "The brand asked to rebook after the last campaign.",
+    "Slow to reply on weekends; plan approvals for weekdays.",
+]
+TERMS = [
+    "Declines gifting-only offers.",
+    "Open to 30-day paid usage.",
+    "Open to whitelisting for a usage fee.",
+    "Prefers 14 days' notice before a shoot.",
+    "Happy to bundle stories with a reel.",
+    "Will not take alcohol or gambling briefs.",
+]
+# (note, what it is about, caption text that makes the conflict plausible)
+CONFLICTS = [
+    ("Exclusive with an energy drink brand until March.", "energy drink", ["energy drink"]),
+    ("Exclusive with a protein powder brand until February.", "protein powder", ["protein shake", "protein oats", "high-protein"]),
+    ("Exclusive with a sunscreen brand until June.", "sunscreen spf", ["sunscreen", "spf"]),
+    ("Non-compete with a running shoe brand through April.", "running shoe", ["running shoes", "racing shoes"]),
+    ("Exclusive with a haircare brand until May.", "haircare hair oil", ["hair oil", "blowout brush", "curls"]),
+    ("Exclusive with an activewear brand until January.", "activewear leggings", ["activewear", "leggings"]),
+    ("Exclusive with a greens powder brand until April.", "greens powder supplement", ["greens powder", "supplements"]),
+    ("Exclusive with a sneaker retailer until July.", "sneaker", ["sneaker"]),
+    ("Exclusive with a makeup brand until March.", "makeup foundation blush", ["foundation", "blush", "makeup"]),
+]
+APPLICANT_STATUS = [
+    "Applied through the form in October; profile reviewed, no call yet.",
+    "Application reviewed: strong saves on tutorials, audience looks real.",
+    "Second application; the first was below the reach bar.",
+    "Applied last week; waiting on a profile review.",
+]
+PROSPECT_STATUS = [
+    "Found while casting a {niche} brief; intro message sent.",
+    "Replied to outreach and asked for a rate card.",
+    "Intro call booked for next week.",
+    "Spotted in a brand's tagged posts; not contacted yet.",
+]
+
+
+def build(n: int, seed: int) -> list[dict]:
+    rnd = random.Random(seed)
 
     names = [(f, l) for f in FIRST for l in LAST]
     rnd.shuffle(names)
+    # Exact shares rather than a coin flip per creator: 60% roster, 25% applicants, 15% prospects.
+    n_roster, n_app = round(n * 0.60), round(n * 0.25)
+    stages = ["roster"] * n_roster + ["applicant"] * n_app + ["prospect"] * (n - n_roster - n_app)
+    rnd.shuffle(stages)
+
     creators = []
-    for i in range(args.n):
+    for i in range(n):
         first, last = names[i]
+        stage = stages[i]
         primary = rnd.choice(PRIMARY)
         niches = [primary]
         if rnd.random() < 0.6:
@@ -191,8 +244,13 @@ def main() -> None:
         # Smaller accounts tend to have higher engagement.
         base = 7.5 - 1.1 * math.log10(followers / 8_000) * 2.2
         engagement = round(max(1.2, base + rnd.uniform(-1.0, 1.0)), 1)
-        avg_views = round(followers * rnd.uniform(0.15, 0.6), -2)
-        rate = max(150, round(followers * rnd.uniform(0.008, 0.02), -1))
+        # Reach is only loosely tied to followers: some small accounts out-reach big ones.
+        reach = round(followers * math.exp(rnd.uniform(math.log(0.25), math.log(1.6))), -2)
+
+        # Audience location is drawn on its own, not from where the creator lives.
+        band = rnd.random()
+        us = rnd.randint(55, 92) if band < 0.55 else rnd.randint(30, 54) if band < 0.85 else rnd.randint(6, 29)
+        top = "United States" if us >= 45 else rnd.choice(OTHER_MARKETS)
 
         pool = list(CAPTIONS[primary])
         rnd.shuffle(pool)
@@ -205,27 +263,60 @@ def main() -> None:
             caps += pool[4:6]
         rnd.shuffle(caps)
 
+        if stage == "roster":
+            notes = [{"kind": "reliability", "text": rnd.choice(RELIABILITY)}]
+        elif stage == "applicant":
+            notes = [{"kind": "status", "text": rnd.choice(APPLICANT_STATUS)}]
+        else:
+            notes = [{"kind": "status", "text": rnd.choice(PROSPECT_STATUS).format(niche=primary)}]
+        text = " ".join(caps).lower()
+        possible = [c for c in CONFLICTS if any(t in text for t in c[2])]
+        if possible and rnd.random() < 0.25:
+            note, about, _ = rnd.choice(possible)
+            notes.append({"kind": "conflict", "text": note, "about": about})
+        elif rnd.random() < 0.6:
+            notes.append({"kind": "terms", "text": rnd.choice(TERMS)})
+
         style = rnd.choice(["{f}{l}", "{f}.{l}", "with{f}", "{f}_{l}", "its{f}{l}"])
         handle = "@" + style.format(f=first.lower(), l=last.lower())
         cid = f"c{i + 1:03d}"
+        on_roster = stage == "roster"
         creators.append({
             "id": cid,
             "name": f"{first} {last}",
             "handle": handle,
+            "stage": stage,
+            "partner": rnd.choice(PARTNERS) if on_roster else None,
+            "campaigns": rnd.randint(1, 14) if on_roster else None,
             "niches": niches,
             "city": city,
             "region": region,
             "country": country,
             "followers": int(followers),
             "engagement": engagement,
-            "avgViews": int(avg_views),
-            "rate": int(rate),
+            "recentReach": int(reach),
+            "audience": {"us": us, "top": top},
+            # Only roster creators have an agreed rate.
+            "rate": int(max(150, round(reach * rnd.uniform(0.012, 0.03), -1))) if on_roster else None,
             "bio": f"{primary.capitalize()} creator in {city}. {TAGLINES[primary]}",
             "captions": caps,
-            # Placeholder photos. Replace with scripts/fetch_images.py.
-            "images": [f"https://picsum.photos/seed/{cid}-{k}/600/800" for k in range(5)],
+            "notes": notes,
+            # Filled by scripts/fetch_images.py. Empty means the UI draws placeholders.
+            "images": [],
         })
 
+    return creators
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--n", type=int, default=120)
+    # The default seed was picked (out of the first few hundred) so the two demo briefs behave
+    # differently: "fitness, energy drinks" fills from the roster with one conflict, and adding
+    # "in Florida" leaves the roster thin enough that applicants and prospects appear.
+    ap.add_argument("--seed", type=int, default=11)
+    args = ap.parse_args()
+    creators = build(args.n, args.seed)
     OUT.parent.mkdir(exist_ok=True)
     OUT.write_text(json.dumps(creators, indent=2))
     print(f"wrote {len(creators)} creators to {OUT}")

@@ -33,7 +33,8 @@ def main() -> None:
     creators = json.loads((ROOT / "data" / "creators.json").read_text())
     texts, owners = [], []
     for c in creators:
-        texts.append(f"{c['bio']} Niches: {', '.join(c['niches'])}. " + " ".join(c["captions"]))
+        texts.append(f"{c['bio']} Niches: {', '.join(c['niches'])}. " + " ".join(c["captions"])
+                     + " Notes: " + " ".join(n["text"] for n in c["notes"]))
         owners.append((c["id"], "doc"))
         for cap in c["captions"]:
             texts.append(cap)

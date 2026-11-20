@@ -1,10 +1,11 @@
 import creatorsJson from "../../data/creators.json";
-import { Creator, LocationFilter, NICHES, ParsedQuery } from "./types";
+import { Creator, LocationFilter, NICHES, ParsedQuery, Stage, STAGES } from "./types";
 
 const creators = creatorsJson as Creator[];
 
 export const emptyQuery = (): ParsedQuery => ({
-  niches: [], locations: [], minFollowers: null, maxFollowers: null, minEngagement: null, semantic: "",
+  niches: [], locations: [], stages: [], minFollowers: null, maxFollowers: null,
+  minEngagement: null, minAudienceUS: null, semantic: "",
 });
 
 // ---------------------------------------------------------------- gazetteer
@@ -15,7 +16,7 @@ const REGION_NAMES: Record<string, string[]> = {
 };
 // First name in each list is the chip label.
 const COUNTRY_NAMES: Record<string, string[]> = {
-  USA: ["united states", "usa", "u.s.", "america"],
+  USA: ["united states", "usa", "u.s.", "america", "the us", "the states", "us-based", "us based", "american"],
   CAN: ["canada"],
   GBR: ["united kingdom", "uk", "england", "britain"],
   NLD: ["netherlands", "holland"],
@@ -45,6 +46,9 @@ const GAZETTEER: [string, LocationFilter][] = (() => {
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const wordRe = (term: string) => new RegExp(`(?<![a-z0-9])${esc(term)}(?![a-z0-9])`, "i");
 
+/** Place names for the "Add filter" control: one label per distinct filter, A to Z. */
+export const PLACES: string[] = [...new Set(GAZETTEER.map(([, f]) => f.label))].sort();
+
 export function resolveLocation(text: string): LocationFilter | null {
   const t = text.trim().toLowerCase();
   const hit = GAZETTEER.find(([term]) => term === t);
@@ -69,7 +73,8 @@ const NICHE_TERMS: Record<string, string[]> = {
 const FILLER = new Set(("a an the and or of in on at to for from with who whos that which is are be do does based located " +
   "creator creators influencer influencers people person someone anyone accounts account talent find show me give " +
   "do does doing did post posts posting posted talk talks talking about content make makes making mention mentions " +
-  "followers follower following audience has have having their them they i want need looking some any").split(" "));
+  "followers follower following audience has have having their them they i want need looking some any " +
+  "whose us we our show list get please brief campaign launch yet already currently").split(" "));
 
 const NUM = String.raw`(\d+(?:[.,]\d+)?)\s*(k|m|thousand|million)?`;
 
@@ -94,7 +99,25 @@ export function parseWithRules(query: string): ParsedQuery {
     return !!m;
   };
 
-  // Engagement first, so its number is not read as a follower count.
+  // Pipeline stage. "Not signed" has to be read before "signed".
+  const addStages = (...st: Stage[]) => { for (const x of st) if (!out.stages.includes(x)) out.stages.push(x); };
+  take(/(?:not|n't|never)\s+(?:yet\s+)?(?:been\s+)?signed(?:\s+yet)?|(?<![a-z])unsigned(?![a-z])|not\s+(?:yet\s+)?on\s+(?:the|our)\s+roster(?:\s+yet)?|off[- ]roster|worth\s+signing/,
+    () => addStages("applicant", "prospect"));
+  take(/(?:already\s+)?(?<![a-z])signed(?![a-z])|(?:on|from|in)\s+(?:the|our)\s+roster|(?<![a-z])roster(?:ed)?(?![a-z])/, () => addStages("roster"));
+  take(/(?<![a-z])(?:applicants?|applications?|applied)(?![a-z])/, () => addStages("applicant"));
+  take(/(?<![a-z])(?:prospects?|scouted)(?![a-z])/, () => addStages("prospect"));
+
+  // Audience location, before places: "US audience" is about followers, "in Florida" about the creator.
+  const US = String.raw`(?<![a-z])(?:u\.?s\.?(?:a\.?)?|united states|american?|stateside)(?![a-z])`;
+  const AUD = String.raw`(?:audience|followers|following|viewers|reach)`;
+  const pct = (v: string) => Math.max(0, Math.min(100, parseFloat(v)));
+  take(new RegExp(String.raw`(?:at least |over |above |more than )?(\d{1,3})\s*%\s*\+?\s*(?:or more )?${US}[- ]?(?:based )?\s*${AUD}`), (m) => { out.minAudienceUS = pct(m[1]); })
+  || take(new RegExp(String.raw`${AUD}\s+(?:(?:that'?s|that is|that are|who are|is|are)\s+)?(?:at least |over |above |more than )?(\d{1,3})\s*%\s*\+?\s*(?:in |from )?(?:the )?${US}`), (m) => { out.minAudienceUS = pct(m[1]); })
+  // No number given: "mostly" is read as at least half.
+  || take(new RegExp(String.raw`(?:(?:mostly|mainly|majority|primarily|largely|predominantly|strong|big)\s+)?${US}[- ]?(?:based )?\s*${AUD}`), () => { out.minAudienceUS = 50; })
+  || take(new RegExp(String.raw`${AUD}\s+(?:(?:that'?s|that is|that are|who are|is|are)\s+)?(?:(?:mostly|mainly|primarily|largely|based)\s+)?(?:in|from)\s+(?:the )?${US}`), () => { out.minAudienceUS = 50; });
+
+  // Engagement next, so its number is not read as a follower count.
   take(new RegExp(String.raw`engagement(?: rate)?\s*(?:over|above|at least|of at least|>=?|more than)\s*(\d+(?:\.\d+)?)\s*%?`), (m) => { out.minEngagement = parseFloat(m[1]); });
   take(/(\d+(?:\.\d+)?)\s*%\s*\+?\s*(?:or (?:higher|more)\s*)?engagement(?: rate)?/, (m) => { out.minEngagement = parseFloat(m[1]); });
   take(/(?:high|strong|good) engagement/, () => { out.minEngagement = 5; });
@@ -151,7 +174,9 @@ Return only a JSON object with these keys:
 - "locations": array of place names exactly as a person would write them (city, US state, or country). Empty if none.
 - "minFollowers", "maxFollowers": integers or null. "micro" means 10000-100000, "nano" means under 10000, "macro" means over 500000.
 - "minEngagement": number (percent) or null.
-- "semantic": the topic, product or vibe to match against their posts, as a short phrase. Empty string if the request is filters only. Never repeat a niche, place or number here.`;
+- "stages": array, each one of ["roster","applicant","prospect"]. Empty unless the request says so. "signed" or "on the roster" means ["roster"]. "applicants" means ["applicant"]. "prospects" means ["prospect"]. "not signed yet" or "worth signing" means ["applicant","prospect"].
+- "minAudienceUS": number 0-100 or null. The minimum share of the creator's AUDIENCE that is in the US. "US audience" or "mostly American followers" with no number means 50. This is about followers, not where the creator lives: "in Florida" is a location, not an audience filter.
+- "semantic": the topic, product or vibe to match against their posts, as a short phrase. Empty string if the request is filters only. It is matched against post captions and CRM notes, so "open to paid usage" or "delivers early" belong here. Never repeat a niche, place, stage or number here.`;
 
 export const llmConfigured = () => !!process.env.OPENAI_API_KEY;
 
@@ -165,14 +190,23 @@ export function sanitize(raw: unknown): ParsedQuery {
       .filter((n) => (NICHES as readonly string[]).includes(n));
   if (Array.isArray(r.locations)) {
     for (const l of r.locations) {
+      // Chips send back the filter itself; keep it if it is one we know, so a city is not re-read as its state.
+      const known = l && typeof l === "object"
+        ? GAZETTEER.find(([, g]) => g.field === (l as LocationFilter).field && g.value === (l as LocationFilter).value)?.[1] : null;
       const f = typeof l === "string" ? resolveLocation(l)
-        : l && typeof l === "object" ? resolveLocation(String((l as LocationFilter).label ?? "")) : null;
+        : known ?? (l && typeof l === "object" ? resolveLocation(String((l as LocationFilter).label ?? "")) : null);
       if (f && !out.locations.some((x) => x.field === f.field && x.value === f.value)) out.locations.push(f);
     }
   }
   out.minFollowers = num(r.minFollowers);
   out.maxFollowers = num(r.maxFollowers);
   out.minEngagement = num(r.minEngagement);
+  if (Array.isArray(r.stages))
+    out.stages = STAGES.filter((st) => (r.stages as unknown[]).some((x) => typeof x === "string" && x.toLowerCase() === st));
+  const us = num(r.minAudienceUS);
+  out.minAudienceUS = us == null ? null : Math.min(100, Math.round(us));
+  if (out.minFollowers != null && out.maxFollowers != null && out.minFollowers > out.maxFollowers)
+    [out.minFollowers, out.maxFollowers] = [out.maxFollowers, out.minFollowers];
   out.semantic = typeof r.semantic === "string" ? r.semantic.trim().slice(0, 200) : "";
   return out;
 }

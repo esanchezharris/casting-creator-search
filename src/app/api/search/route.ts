@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { parseQuery, sanitize } from "@/lib/parse";
+import { parseQuery, PLACES, sanitize } from "@/lib/parse";
 import { search } from "@/lib/search";
 import type { SearchResponse } from "@/lib/types";
 
@@ -21,9 +21,9 @@ export async function POST(req: Request) {
     ({ parsed, parser } = await parseQuery(String(body.query ?? "").slice(0, 300)));
   }
 
-  const { results, ranker } = await search(parsed);
+  const { results, offRoster, ranker } = await search(parsed);
   const payload: SearchResponse = {
-    parsed, parser, ranker, results, tookMs: Math.round(performance.now() - started),
+    parsed, parser, ranker, results, offRoster, places: PLACES, tookMs: Math.round(performance.now() - started),
   };
   return NextResponse.json(payload);
 }
