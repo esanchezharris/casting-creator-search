@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import creatorsJson from "../../data/creators.json";
+import { closest } from "./fuzzy";
 import { Creator, ParsedQuery, SearchResult } from "./types";
 
 export const creators = creatorsJson as Creator[];
@@ -36,8 +37,11 @@ function clip(s: string, n = 90) {
   return s.length <= n ? s : s.slice(0, s.lastIndexOf(" ", n)) + "…";
 }
 
+/** Query words, with a word nobody has ever written swapped for its nearest neighbour ("sunscrean"). */
+const queryTokens = (text: string) => [...new Set(tokens(text).map((t) => (df.has(t) ? t : closest(t, df.keys()) ?? t)))];
+
 function rankByKeywords(pool: Creator[], semantic: string): SearchResult[] {
-  const q = [...new Set(tokens(semantic))];
+  const q = queryTokens(semantic);
   return pool.map((creator) => {
     const toks = docTokens.get(creator.id)!;
     let score = 0;
@@ -63,7 +67,7 @@ function rankByKeywords(pool: Creator[], semantic: string): SearchResult[] {
 
 /** A conflict note is worth a warning when what it covers overlaps the topic being searched. */
 function conflictFor(creator: Creator, semantic: string): string | null {
-  const q = new Set(tokens(semantic));
+  const q = new Set(queryTokens(semantic));
   const hit = creator.notes.find((n) => n.kind === "conflict" && tokens(n.about ?? n.text).some((t) => q.has(t)));
   return hit ? hit.text : null;
 }
@@ -126,6 +130,17 @@ export const ROSTER_MIN = 5;
 
 type Ranker = "embeddings" | "keywords" | "reach";
 
+/**
+ * Keyword matches scoring below this share of the best match are dropped. Without it, a creator
+ * who matches one word of three ("outfits" for "wedding guest outfits") counts as a roster match,
+ * pads the roster past ROSTER_MIN and hides the applicants who really fit.
+ * Chosen from the eval queries (scripts/eval_queries.json): returned creators were binned by
+ * score / best score and labelled relevant or not. The two groups overlap, so no value is clean;
+ * the eval was rerun at 0, 0.3, 0.4, 0.5 and 0.6. Mean P@5 rose 0.83 -> 0.88 up to 0.5 while
+ * recall held (0.79 -> 0.78); at 0.6 recall fell to 0.60. So 0.5.
+ */
+const KEYWORD_CUTOFF = Number(process.env.KEYWORD_CUTOFF ?? 0.5);
+
 async function rank(pool: Creator[], semantic: string): Promise<{ ranked: SearchResult[]; ranker: Ranker }> {
   if (!semantic.trim()) {
     // No topic: best photo sets first (this is the first screen of the demo), then recent reach.
@@ -144,7 +159,11 @@ async function rank(pool: Creator[], semantic: string): Promise<{ ranked: Search
       console.warn("embedding ranker failed, using keywords:", e);
     }
   }
-  ranked ??= rankByKeywords(pool, semantic).filter((r) => r.score > 0);
+  if (!ranked) {
+    ranked = rankByKeywords(pool, semantic).filter((r) => r.score > 0);
+    const best = Math.max(0, ...ranked.map((r) => r.score));
+    ranked = ranked.filter((r) => r.score >= KEYWORD_CUTOFF * best);
+  }
   for (const r of ranked) {
     r.warning = conflictFor(r.creator, semantic);
     // A creator who cannot take the brief should not outrank one who can.

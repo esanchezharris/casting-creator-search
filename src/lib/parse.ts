@@ -1,4 +1,5 @@
 import creatorsJson from "../../data/creators.json";
+import { closest } from "./fuzzy";
 import { Creator, LocationFilter, NICHES, ParsedQuery, Stage, STAGES } from "./types";
 
 const creators = creatorsJson as Creator[];
@@ -70,6 +71,35 @@ const NICHE_TERMS: Record<string, string[]> = {
   food: ["food", "foodie", "cooking", "recipes"],
 };
 
+const TERM_TO_NICHE = new Map(Object.entries(NICHE_TERMS).flatMap(([niche, terms]) => terms.map((t) => [t, niche] as const)));
+// Words that name a kind of person, so they are always a creator type: "runners", "foodies".
+const AGENT_TERMS: Record<string, string> = {
+  runner: "running", runners: "running", foodie: "food", foodies: "food", yogi: "wellness", yogis: "wellness",
+  lifter: "fitness", lifters: "fitness", sneakerhead: "streetwear", sneakerheads: "streetwear",
+};
+for (const [t, n] of Object.entries(AGENT_TERMS)) TERM_TO_NICHE.set(t, n);
+const CREATOR_NOUNS = new Set("creator creators influencer influencers people person account accounts talent pages girls guys folks".split(" "));
+// A niche word right after one of these is a subject, not a creator type: "about running", "for the gym".
+const TOPIC_BEFORE = new Set("the a an about for before after at to my their of on review reviews reviewing".split(" "));
+// A niche word right before one of these (or at the end) is a creator type: "skincare in New York".
+const LINK_AFTER = new Set("in with who that whose over under from based near around above below between only".split(" "));
+const JOINERS = new Set(["and", "or", "&", "/", ","]);
+
+const TENS: Record<string, number> = { ten: 10, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+
+/** Numbers written as words, so the range rules below only have to read digits. */
+function spellOutNumbers(text: string): string {
+  return text
+    .replace(/(?:a |one )?quarter (?:of a )?million/g, "250000")
+    .replace(/half (?:a )?million/g, "500000")
+    .replace(/(?:a|one) million/g, "1000000")
+    .replace(/(?:a|one) hundred(?= ?(?:k|thousand))/g, "100")
+    .replace(new RegExp(String.raw`(?<![a-z])(${Object.keys(TENS).join("|")})(?=\s*(?:k(?![a-z])|thousand|million|and\s|to\s|-))`, "g"), (w) => String(TENS[w]))
+    .replace(/(?:no|not) more than|at most|maximum of|a max(?:imum)? of/g, "under")
+    .replace(/(?:no|not) (?:less|fewer) than|minimum of|a min(?:imum)? of/g, "over")
+    .replace(/(\d[\d.,]*\s*(?:k|m|thousand|million)?)\s+plus(?![a-z])/g, "$1+");
+}
+
 const FILLER = new Set(("a an the and or of in on at to for from with who whos that which is are be do does based located " +
   "creator creators influencer influencers people person someone anyone accounts account talent find show me give " +
   "do does doing did post posts posting posted talk talks talking about content make makes making mention mentions " +
@@ -92,7 +122,7 @@ function toNumber(n: string, suffix?: string): number {
  */
 export function parseWithRules(query: string): ParsedQuery {
   const out = emptyQuery();
-  let rest = " " + query.toLowerCase().replace(/[“”"]/g, " ") + " ";
+  let rest = " " + spellOutNumbers(query.toLowerCase().replace(/[“”"]/g, " ")) + " ";
   const take = (re: RegExp, fn: (m: RegExpMatchArray) => void) => {
     const m = rest.match(re);
     if (m) { fn(m); rest = rest.replace(m[0], " "); }
@@ -152,17 +182,57 @@ export function parseWithRules(query: string): ParsedQuery {
     }
   }
 
-  for (const [niche, terms] of Object.entries(NICHE_TERMS)) {
-    for (const term of terms) {
-      const re = wordRe(term);
-      if (re.test(rest)) {
-        rest = rest.replace(re, " ");
-        if (!out.niches.includes(niche)) out.niches.push(niche);
+  // Misspelled places: compare what is left, up to three words at a time, with the canonical names.
+  {
+    const names = GAZETTEER.filter(([term, f]) => term === f.label.toLowerCase());
+    const left = rest.split(/\s+/).filter(Boolean);
+    for (let n = 3; n >= 1; n--) {
+      for (let i = 0; i + n <= left.length; i++) {
+        const phrase = left.slice(i, i + n).join(" ").replace(/[^a-z ]/g, "");
+        const hit = closest(phrase, names.filter(([term]) => term.split(" ").length === n).map(([term]) => term));
+        if (!hit) continue;
+        const filter = names.find(([term]) => term === hit)![1];
+        if (!out.locations.some((l) => l.field === filter.field && l.value === filter.value)) out.locations.push(filter);
+        rest = rest.replace(left.slice(i, i + n).join(" "), " ");
+        left.splice(i, n, ...new Array<string>(n).fill(""));
       }
     }
   }
 
-  out.semantic = rest.split(/[^a-z0-9'-]+/).filter((w) => w && !FILLER.has(w)).join(" ");
+  // Niches. A niche word is a creator type in "fitness creators" or "skincare in New York", but a
+  // topic in "running shoes", "about fitness" or "for the gym". Decide from the words around it.
+  const words = [...rest.replace(/skin care/g, "skincare").matchAll(/[a-z0-9][a-z0-9'’-]*|[,&\/]/g)].map((m) => m[0]);
+  for (let i = 0; i < words.length; i++) {
+    if (!TERM_TO_NICHE.has(words[i]) && !CREATOR_NOUNS.has(words[i]))
+      words[i] = closest(words[i], [...TERM_TO_NICHE.keys(), ...CREATOR_NOUNS]) ?? words[i];
+  }
+  const drop = new Set<number>();
+  let lastWasTopic = false;
+  words.forEach((w, i) => {
+    const niche = TERM_TO_NICHE.get(w);
+    if (!niche) return;
+    let j = i + 1;
+    while (j < words.length && (JOINERS.has(words[j]) || TERM_TO_NICHE.has(words[j]))) j++;
+    const next = words[j];
+    const prev = words[i - 1];
+    let isNiche: boolean;
+    let keepAsTopic = false;
+    if (next && CREATOR_NOUNS.has(next)) isNiche = true;
+    else if (w in AGENT_TERMS) isNiche = true;
+    else if (prev && (TOPIC_BEFORE.has(prev) || (JOINERS.has(prev) && lastWasTopic))) isNiche = false;
+    else if (!next || LINK_AFTER.has(next)) {
+      isNiche = true;
+      // "who does pilates": a wellness creator, and pilates is still the thing to look for in posts.
+      keepAsTopic = !(NICHES as readonly string[]).includes(w);
+    } else isNiche = false;
+    lastWasTopic = !isNiche;
+    if (isNiche) {
+      if (!out.niches.includes(niche)) out.niches.push(niche);
+      if (!keepAsTopic) drop.add(i);
+    }
+  });
+
+  out.semantic = words.filter((w, i) => !drop.has(i) && !JOINERS.has(w) && !FILLER.has(w)).join(" ");
   return out;
 }
 

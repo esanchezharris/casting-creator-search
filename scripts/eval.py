@@ -10,7 +10,8 @@ Per run:
 
 "Relevant" means a post (or, for note queries, a CRM note) contains one of the
 case's terms. The ground truth is computed here from the data file, never from
-the API. It follows the product's roster-first rule: with no stage asked for,
+the API. Cases marked "held_out" were written after the parser fixes and are
+reported separately, because the other cases were used to find those fixes. It follows the product's roster-first rule: with no stage asked for,
 the expected set is the relevant roster creators, plus relevant applicants and
 prospects only when fewer than five roster creators qualify.
 
@@ -82,62 +83,64 @@ def ground_truth(case: dict) -> set[str]:
     return {c["id"] for c in (roster if len(roster) >= ROSTER_MIN else fit)}
 
 
+def score(url: str, case: dict) -> dict:
+    out = call(url, case["query"])
+    shown = out["results"] + out["offRoster"]
+    row = {"case": case, "parsed": out["parsed"], "filters": filters_ok(case.get("filters", {}), out["parsed"]),
+           "mode": f"parser={out['parser']} ranker={out['ranker'] if out['ranker'] != 'reach' else 'none (no topic)'}",
+           "p": None, "r": None, "empty": None, "note": ""}
+    has_topic = "relevant_if_caption_has" in case or "relevant_if_note_has" in case
+    truth = ground_truth(case) if has_topic else set()
+    # A case can ask for nobody outright, or the data can simply hold nobody who fits.
+    if case.get("expect_empty") or (has_topic and not truth):
+        row["empty"] = not shown
+        row["note"] = "nobody fits, nobody returned" if not shown else f"nobody fits, but {len(shown)} returned"
+    elif has_topic:
+        top = shown[:5]
+        # Empty results score zero: returning nobody when someone fits is a miss.
+        row["p"] = sum(relevant(r["creator"], case) for r in top) / len(top) if top else 0.0
+        row["r"] = len(truth & {x["creator"]["id"] for x in shown}) / len(truth)
+        row["note"] = f"{len(truth)} expected, {len(shown)} returned"
+    return row
+
+
+def summary(name: str, rows: list[dict]) -> None:
+    ps = [r["p"] for r in rows if r["p"] is not None]
+    rs = [r["r"] for r in rows if r["r"] is not None]
+    es = [r["empty"] for r in rows if r["empty"] is not None]
+    line = f"{name}: filters {sum(r['filters'] for r in rows)}/{len(rows)}"
+    if ps:
+        line += f", mean P@5 {sum(ps) / len(ps):.2f} and mean recall {sum(rs) / len(rs):.2f} over {len(ps)} topic queries"
+    if es:
+        line += f", nobody-fits {sum(es)}/{len(es)}"
+    print(line)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default="http://localhost:3000")
     ap.add_argument("--quiet", action="store_true", help="only print the summary")
     args = ap.parse_args()
 
-    f_pass = f_n = 0
-    p_sum = r_sum = 0.0
-    p_n = r_n = 0
-    e_pass = e_n = 0
-    modes: set[str] = set()
-    rows = []
-    for case in CASES:
-        out = call(args.url, case["query"])
-        modes.add(f"parser={out['parser']} ranker={out['ranker'] if out['ranker'] != 'reach' else 'none (no topic)'}")
-        shown = out["results"] + out["offRoster"]
-        ok = filters_ok(case.get("filters", {}), out["parsed"])
-        f_pass += ok
-        f_n += 1
-        p_txt = r_txt = "    -"
-        note = ""
-        has_topic = "relevant_if_caption_has" in case or "relevant_if_note_has" in case
-        truth = ground_truth(case) if has_topic else set()
-        # A case can ask for nobody outright, or the data can simply hold nobody who fits.
-        if case.get("expect_empty") or (has_topic and not truth):
-            e_n += 1
-            e_pass += not shown
-            note = "nobody fits, nobody returned" if not shown else f"nobody fits, but {len(shown)} returned"
-        elif has_topic:
-            top = shown[:5]
-            # Empty results score zero: returning nobody when someone fits is a miss.
-            p = sum(relevant(r["creator"], case) for r in top) / len(top) if top else 0.0
-            p_sum += p
-            p_n += 1
-            p_txt = f"{p:5.2f}"
-            r = len(truth & {x["creator"]["id"] for x in shown}) / len(truth)
-            r_sum += r
-            r_n += 1
-            r_txt = f"{r:5.2f}"
-            note = f"{len(truth)} expected, {len(shown)} returned"
-        rows.append((ok, p_txt, r_txt, case["query"], note, out["parsed"]))
-
+    rows = [score(args.url, case) for case in CASES]
     if not args.quiet:
         print(f"{'filters':8} {'P@5':>5} {'recall':>6}  query")
-        for ok, p_txt, r_txt, query, note, parsed in rows:
-            print(f"{'pass' if ok else 'FAIL':8} {p_txt} {r_txt:>6}  {query}" + (f"   [{note}]" if note else ""))
-            if not ok:
-                parsed["locations"] = [l["value"] for l in parsed["locations"]]
+        for r in rows:
+            fmt = lambda v: "    -" if v is None else f"{v:5.2f}"
+            print(f"{'pass' if r['filters'] else 'FAIL':8} {fmt(r['p'])} {fmt(r['r']):>6}  {r['case']['query']}"
+                  + (f"   [{r['note']}]" if r["note"] else ""))
+            if not r["filters"]:
+                parsed = dict(r["parsed"], locations=[l["value"] for l in r["parsed"]["locations"]])
                 print(f"{'':22} parsed: {json.dumps({k: v for k, v in parsed.items() if v not in ([], None, '')})}")
-    print()
-    print("; ".join(sorted(modes)))
-    print(f"filters correct: {f_pass}/{f_n}")
-    print(f"mean P@5 over {p_n} topic queries: {p_sum / p_n:.2f}" if p_n else "no topic queries")
-    print(f"mean recall over {r_n} topic queries: {r_sum / r_n:.2f}" if r_n else "no recall cases")
-    if e_n:
-        print(f"queries that should return nobody: {e_pass}/{e_n} correct")
+        print()
+    print("; ".join(sorted({r["mode"] for r in rows})))
+    # Held-out cases were written after the parser fixes and never tuned against.
+    tuned = [r for r in rows if not r["case"].get("held_out")]
+    held = [r for r in rows if r["case"].get("held_out")]
+    summary("all", rows)
+    if held:
+        summary("tuned on", tuned)
+        summary("held out", held)
 
 
 if __name__ == "__main__":
