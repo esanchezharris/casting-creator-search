@@ -168,6 +168,11 @@ button { cursor: pointer; background: none; border: 0; padding: 0; }
 .frame:has(.ph) .ticks i { background: color-mix(in srgb, var(--ink) 16%, transparent); box-shadow: none; }
 .frame:has(.ph) .ticks i.on { background: var(--ink); }
 
+.credit { margin: 6px 6px 0; font-size: 13px; color: var(--muted); }
+.credit a, .fine a { color: inherit; text-underline-offset: 2px; }
+.credit a:hover, .fine a:hover { color: var(--ink); }
+.credit + .who { padding-top: 8px; }
+.look .credit { margin: 8px 0 0; }
 .who { padding: 12px 6px 0; }
 .who-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .who h3, .who h2 { margin: 0; font-size: 19px; font-weight: 500; letter-spacing: -0.015em; line-height: 1.2; }

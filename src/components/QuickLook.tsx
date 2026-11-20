@@ -1,6 +1,6 @@
 "use client";
 
-import { compact, Facts, FRAME_COUNT, Frames, PickButton, placeOf, STAGE_LABEL, Ticks, useScrub } from "@/components/CreatorCard";
+import { compact, Facts, FRAME_COUNT, Frames, PhotoCredit, PickButton, placeOf, STAGE_LABEL, Ticks, useScrub } from "@/components/CreatorCard";
 import type { SearchResult } from "@/lib/types";
 
 const NOTE_LABEL = { reliability: "Reliability", terms: "Terms", conflict: "Conflict", status: "Status" };
@@ -44,6 +44,7 @@ export function QuickLook({ result, position, picked, onPick, onClose }: Props) 
             </button>
           ))}
         </div>
+        <PhotoCredit creator={creator} />
 
         <div className="who">
           <div className="who-top">

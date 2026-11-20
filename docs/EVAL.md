@@ -1,10 +1,10 @@
 # Eval
 
 `scripts/eval.py` sends every query in `scripts/eval_queries.json` to the running
-app and scores what comes back. The full output of the latest run is in
-[eval-run-rules-keywords.txt](eval-run-rules-keywords.txt). Every number below
-comes from a run on 20 Nov 2026 against the seed-11 dataset (120 fictional
-creators: 72 roster, 30 applicants, 18 prospects).
+app and scores what comes back. Every number here comes from a run on 20 Nov
+2026 against the seed-11 dataset (120 fictional creators: 72 roster, 30
+applicants, 18 prospects). The full output of the final run in each mode is in
+[eval-runs/](eval-runs/).
 
 ## What is measured
 
@@ -20,106 +20,167 @@ creators: 72 roster, 30 applicants, 18 prospects).
 - **Nobody fits**: for queries where the data holds no one who qualifies, did
   the search return no one?
 
-## Results
+56 queries: 46 that the fixes below were developed against ("tuned"), and 10
+written after the parser fixes and kept apart ("held out"). 29 of the 56 have a
+topic, so P@5 and recall are means over 24 tuned and 5 held-out queries.
 
-Only one mode could be run. There is no `OPENAI_API_KEY` in `.env.local`, so
-the LLM parser and the embedding ranker have still never been executed.
+## Results, final code, all four modes
 
-| Step | Parser + ranker | Cases | Filters | P@5 | Recall | Nobody fits |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1. After the pipeline model (Phase 0) | rules + keywords | 21 | 19/21 | 0.98 (12 queries) | 0.90 | 1/1 |
-| 2. Hard cases added, no fixes yet | rules + keywords | 46 | 35/46 | 0.78 (24 queries) | 0.73 | 4/4 |
-| 3. Parser fixes | rules + keywords | 46 | 46/46 | 0.83 | 0.79 | 4/4 |
-| 4. Ranking fixes (current) | rules + keywords | 46 | 46/46 | 0.88 | 0.77 | 4/4 |
-| 5. Held-out cases (current) | rules + keywords | 10 | 7/10 | 0.80 (5 queries) | 0.80 | 0/1 |
-| All 56 cases (current) | rules + keywords | 56 | 53/56 | 0.86 (29 queries) | 0.77 | 4/5 |
-| LLM parser | llm + keywords | not run | | | | |
-| LLM parser, embedding ranker | llm + embeddings | not run | | | | |
+| Parser + ranker | Set | Filters | P@5 | Recall | Nobody fits |
+| --- | --- | --- | --- | --- | --- |
+| rules + keywords | tuned | 46/46 | 0.88 | 0.77 | 4/4 |
+| rules + keywords | held out | 7/10 | 0.80 | 0.80 | 1/1 |
+| LLM + keywords | tuned | 45/46 | 0.81 | 0.71 | 4/4 |
+| LLM + keywords | held out | 7/10 | 0.80 | 0.80 | 1/1 |
+| rules + embeddings | tuned | 46/46 | 0.84 | 0.79 | 2/4 |
+| rules + embeddings | held out | 7/10 | 0.59 | 0.89 | 0/1 |
+| LLM + embeddings (the default with a key) | tuned | 45/46 | 0.83 | 0.75 | 2/4 |
+| LLM + embeddings (the default with a key) | held out | 7/10 | 0.63 | 1.00 | 1/1 |
 
-Rows 1 to 4 are the same code path at four points in time, so they show what
-each change did. Row 4 is the current state on the 46 cases the fixes were
-developed against: read 46/46 as "the regression set passes", not as accuracy.
-Row 5 is ten queries written after the parser fixes and never used to tune the
-parser. It is the more honest number, with one caveat spelled out below.
+Models: `gpt-4o-mini` for parsing at temperature 0, `text-embedding-3-small` at
+256 dimensions. LLM runs are not perfectly repeatable even at temperature 0:
+two runs of the same build of LLM + keywords gave 46/46 filters with P@5 0.85,
+then 45/46 with P@5 0.81. The table shows the later run.
 
-## What each step fixed
+**The plain reading: on this dataset the cheap baseline wins on average.**
+Rules + keywords has the best precision and is the only mode that reliably says
+"nobody fits". The language-model parts earn their place on one kind of query,
+paraphrase, and lose a little everywhere else:
 
-**Step 2 to 3, parser.** Three rule changes took filters from 35/46 to 46/46.
-A niche word is now read as a creator type only when the words around it say
-so ("fitness creators", "skincare in New York", "runners"), and as a topic
-otherwise ("running shoes", "hair ties for the gym", "before lifting"). Number
-words and odd phrasings are rewritten to digits before the range rules run ("a
-quarter million plus", "between fifty and a hundred thousand", "no more than
-30,000"). Misspelled niches, places and topic words are matched to the nearest
-known word within one edit, two for long words ("fitnes creaters in Flordia",
-"sunscrean").
+| Query | rules + keywords | LLM + embeddings |
+| --- | --- | --- |
+| getting better rest at night | P@5 0.00, recall 0.00 | P@5 1.00, recall 1.00 |
+| stuff that keeps your face from burning at the beach | 0.00, 0.22 | 1.00, 1.00 |
+| footwear for long distance | 0.80, 0.62 | 1.00, 1.00 |
+| something to drink before lifting | 1.00, 0.24 | 1.00, 0.29 |
+| hair ties for the gym | 0.40, 0.80 | 0.20, 0.20 |
+| Runners who review shoes | 1.00, 1.00 | 0.50, 0.00 |
+| creators who post about cryptocurrency trading (nobody fits) | returns nobody | returns 8 creators |
 
-**Step 3 to 4, ranking.** Three changes. Keyword ranking used to return anyone
-who matched a single word; those weak matches counted as roster matches,
-pushed the roster past five and hid the applicants who actually fit. Results
-under half the best score are now dropped. The threshold was picked by running
-the eval at 0, 0.3, 0.4, 0.5 and 0.6: P@5 rose from 0.83 to 0.88 up to 0.5 with
-recall about flat, and at 0.6 recall fell to 0.65. Second, conflict notes no
-longer count toward the score. "Exclusive with an energy drink brand" was
-making a creator the top match for an energy drink brief, which is backwards;
-it now produces a warning on the card and halves the score. Third, a stage
-filter is applied before the cutoff instead of after.
+## How the numbers got here
 
-**The held-out caveat.** The held-out set first scored P@5 0.90, recall 0.80.
-Taking conflict notes out of the score dropped it to 0.70 and 0.70, because
-"prospects who review protein powder" started returning nobody: the cutoff was
-being measured against a roster creator the query had excluded. That was a
-real bug and fixing it (the third change above) brought the set to 0.80 and
-0.80. So one ranking fix was prompted by a held-out query. No parser rule was
-changed for the held-out set, and its three parser misses are still misses.
+The same 46 tuned queries, rule parser and keyword ranking, at each step:
+
+| Step | Cases | Filters | P@5 | Recall | Nobody fits |
+| --- | --- | --- | --- | --- | --- |
+| 1. After the pipeline model (Phase 0) | 21 | 19/21 | 0.98 (12 queries) | 0.90 | 1/1 |
+| 2. Hard cases added, no fixes yet | 46 | 35/46 | 0.78 (24 queries) | 0.73 | 4/4 |
+| 3. Parser fixes | 46 | 46/46 | 0.83 | 0.79 | 4/4 |
+| 4. Ranking fixes (final) | 46 | 46/46 | 0.88 | 0.77 | 4/4 |
+
+Read 46/46 as "the regression set passes", not as accuracy. The held-out 7/10
+is the honest figure for the parser.
+
+**Step 2 to 3, rule parser.** A niche word is read as a creator type only when
+the words around it say so ("fitness creators", "skincare in New York",
+"runners"), and as a topic otherwise ("running shoes", "hair ties for the gym",
+"before lifting"). Number words and odd phrasings are rewritten to digits before
+the range rules run ("a quarter million plus", "between fifty and a hundred
+thousand", "no more than 30,000"). Misspelled niches, places and topic words are
+matched to the nearest known word within one edit, two for long words ("fitnes
+creaters in Flordia", "sunscrean").
+
+**Step 3 to 4, keyword ranking.** Keyword ranking used to return anyone who
+matched a single word; those weak matches counted as roster matches, pushed
+the roster past five and hid the applicants who actually fit. Results under
+half the best score are now dropped (chosen by running the eval at 0, 0.3, 0.4,
+0.5 and 0.6: P@5 rose from 0.83 to 0.88 up to 0.5, and at 0.6 recall fell to
+0.65). Conflict notes and pipeline-status notes no longer count toward the
+score: "exclusive with an energy drink brand" was making a creator the top
+match for an energy drink brief, which is backwards. It now produces a warning
+on the card and halves the score. A stage filter is applied before the cutoff
+instead of after.
+
+**The held-out caveat.** One ranking bug was found through a held-out query.
+With conflict notes out of the score, "prospects who review protein powder"
+returned nobody, because the cutoff was being measured against a roster
+creator the query had excluded. That fix is the stage-before-cutoff change
+above. No parser rule was changed for the held-out set.
+
+**LLM parser, first run to final.** It had never been run. Unmodified, it
+scored 41/46 filters, P@5 0.80 and recall 0.63 on the tuned set with keyword
+ranking. Three things were wrong and all three are fixed in code, not by hoping:
+
+- It invented a niche from the topic ("something to drink before lifting"
+  became fitness) and invented follower limits nobody asked for. The prompt now
+  carries three complete worked examples.
+- After a prompt change it sometimes returned filters and dropped the topic, so
+  the search silently ran on filters alone. If the model returns no topic and
+  the rule parser finds one in the same sentence, the rule parser's is used.
+- It misread numbers: "50K+" came back as 500,000, and so did "a quarter
+  million plus". Whenever the rule parser reads a figure out of the sentence,
+  that figure replaces the model's, and the replacement is logged.
+
+**Embedding ranker, first run to final.** `scripts/embed.py` ran clean on the
+first try. The ranker worked but returned every creator who passed the filters,
+so the roster always looked full. The cutoff (drop anything under 0.8 of the
+best score) was chosen on the tuned set with the rule parser:
+
+| Cutoff | 0 | 0.7 | 0.8 | 0.85 | 0.9 |
+| --- | --- | --- | --- | --- | --- |
+| P@5 | 0.72 | 0.81 | 0.84 | 0.88 | 0.93 |
+| Recall | 0.86 | 0.89 | 0.79 | 0.72 | 0.71 |
+
+0.7 has the best averages but is unusable: "getting better rest at night" has
+five right answers and it returned 31 creators. CRM notes are embedded one by
+one so "open to paid usage" can match a note.
 
 ## What still fails
 
-Paraphrases, which is the gap the embedding ranker exists to close and which
-could not be tested here:
+Embedding ranker:
 
-| Query | P@5 | Recall |
-| --- | --- | --- |
-| getting better rest at night | 0.00 | 0.00 |
-| stuff that keeps your face from burning at the beach | 0.00 | 0.22 |
-| hair ties for the gym | 0.40 | 0.80 |
-| something to drink before lifting | 1.00 | 0.24 |
-| who talks about caffeine before the gym | 0.80 | 0.24 |
-| footwear for long distance | 0.80 | 0.62 |
+- **It cannot say "nobody fits."** "Cryptocurrency trading" returns 8 creators
+  and "fitness creators in Tokyo" returns 6. An absolute score floor does not
+  work: off-topic queries peak at 0.24 to 0.36 while a good query ("runners who
+  review shoes") peaks at 0.27.
+- **Short generic topics.** "Runners who review shoes" returns only two
+  creators and misses all eight on the roster who post about running shoes
+  (recall 0.00). My reading, not yet confirmed: the topic sent to the model is
+  "review shoes", which sits closer to posts with "review" in them than to
+  "tested four pairs of running shoes", and the cutoff then drops the right posts.
+- **Precision on exact terms.** "Creaters in Calfornia who post about meal
+  prep" has one right answer and returns six. Held-out P@5 is 0.59 to 0.63
+  against 0.80 for keywords.
 
-"Getting better rest at night" returns five creators and none of them posted
-about sleep: the only shared word is "night". Keyword search cannot know that
-rest means sleep.
+Keyword ranker: paraphrases, as in the table above. "Getting better rest at
+night" returns five creators and none posted about sleep; the only shared word
+is "night". Also "fitness creators who post about running" finds 3 of 6,
+because posts say "long run" and the query says "running".
 
-Held-out parser misses, left unfixed on purpose:
+Parsers, held-out misses left unfixed on purpose:
 
-- "yoga teachers with over 80k followers": "yoga" is followed by a noun that
-  is not in the creator-word list, so it is read as a topic, not as wellness.
-- "roster talent in Texas with 60% or more of their audience in the US": the
-  audience rule fires but misses the number and falls back to 50.
-- "top beauty and haircare creators, half a million and up": "and up" is not a
-  known way to say "or more", so 500000 ends up in the topic text.
-- "makeup tutorials from creators in Chicago": nobody in Chicago posts about
-  makeup, but one creator is returned for the word "tutorial".
+- "yoga teachers with over 80k followers" (rules): "yoga" is followed by a
+  noun that is not in the creator-word list, so it is read as a topic.
+- "top beauty and haircare creators, half a million and up" (rules): "and up"
+  is not a known way to say "or more".
+- "roster talent in Texas with 60% or more of their audience in the US" (both):
+  the rule parser reads 50 instead of 60. In LLM mode the number cross-check
+  then overwrites whatever the model said with that wrong 50. The cross-check
+  fixes more than it breaks here, but it can import a rule-parser mistake.
+- "sneakerheads in New York" (LLM): read as no niche or as fashion, not streetwear.
+- "streetwear creators with no more than 30,000 followers" (LLM): the model
+  adds a 10,000 minimum nobody asked for.
+- "makeup tutorials from creators in Chicago" (LLM): reads "beauty" as a niche;
+  the expected answer treats makeup as the topic. Arguably the model is right.
 
-Partial misses: "fitness creators who post about running"
-finds 3 of 6 (posts say "long run" and "tempo run", the query says "running",
-and the stemmer does not connect them), and the held-out "anyone under 20k who posts thrift hauls" returns
-two creators of whom only one mentions thrifting.
+What the obvious next step is: a hybrid ranker. Keywords decide whether anyone
+fits at all and handle exact terms; embeddings reorder and add paraphrase
+matches. That has not been built or measured.
 
-Other limits worth knowing:
+## Limits of this eval
 
 - Captions come from about 80 templates, so many creators share identical
-  posts. Scores on real captions would be lower and noisier.
+  posts. That flatters keyword matching. Scores on real captions would be lower
+  and noisier, and the gap to embeddings would likely close.
 - Relevance is a substring check against a hand-written term list per query.
-  It is cheap and repeatable but it is my judgment, not a second rater's.
-- 29 topic queries is a small sample. A single query moves mean P@5 by 0.03.
+  It is cheap and repeatable but it is one person's judgment.
+- 29 topic queries is a small sample. A single query moves mean P@5 by 0.03,
+  and by 0.20 on the five held-out topic queries.
 
 ## Run it
 
     npm run dev                      # or: npx next dev --port 3210
     npm run eval -- --url http://localhost:3210
 
-To compare modes once a key is set, restart the app with `PARSER=rules` and/or
-`RANKER=keywords` and rerun. The script prints which parser and ranker
-actually answered.
+The script prints which parser and ranker actually answered. To force a mode,
+start the app with `PARSER=rules` and/or `RANKER=keywords`.

@@ -31,6 +31,8 @@ export type Creator = {
   captions: string[];
   notes: Note[];
   images: string[];
+  /** Set by scripts/fetch_images.py when the photos come from Unsplash. */
+  photoCredit?: { name: string; url: string };
 };
 
 export type LocationFilter = {

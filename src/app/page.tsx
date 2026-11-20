@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CreatorCard, compact, money } from "@/components/CreatorCard";
+import { CreatorCard, compact, money, UNSPLASH_URL } from "@/components/CreatorCard";
 import { FilterChips, summarize, type FilterEdit } from "@/components/FilterChips";
 import { QuickLook } from "@/components/QuickLook";
 import type { Creator, SearchResponse, SearchResult } from "@/lib/types";
@@ -10,7 +10,7 @@ const EXAMPLES = [
   "Fitness creators who post about energy drinks",
   "Fitness creators in Florida who post about energy drinks",
   "Skincare creators with a mostly US audience who post about sunscreen",
-  "Runners who review shoes",
+  "Who on the roster is open to paid usage",
 ];
 
 type Sort = "match" | "reach" | "followers" | "engagement" | "rate";
@@ -291,7 +291,10 @@ export default function Page() {
       </p>
       <p className="fine">
         Every creator, number and note on this page is fictional and generated for the demo.
-        {all.some((r) => r.creator.images.length === 0) && " Photo frames are placeholders."}
+        {all.some((r) => r.creator.images.length > 0) && (
+          <> Photos from <a href={UNSPLASH_URL} target="_blank" rel="noreferrer">Unsplash</a>; the people in them are not these creators.</>
+        )}
+        {all.some((r) => r.creator.images.length === 0) && " Frames with initials are placeholders for profiles with no photos yet."}
       </p>
 
       {open && (

@@ -85,6 +85,19 @@ export function Frames({ creator, index, loadAll }: { creator: Creator; index: n
   );
 }
 
+export const UNSPLASH_URL = "https://unsplash.com/?utm_source=casting_demo&utm_medium=referral";
+
+/** Unsplash asks for the photographer and Unsplash to be credited, with links, wherever a photo shows. */
+export function PhotoCredit({ creator }: { creator: Creator }) {
+  if (!creator.photoCredit) return null;
+  return (
+    <p className="credit">
+      Photos by <a href={creator.photoCredit.url} target="_blank" rel="noreferrer">{creator.photoCredit.name}</a> on{" "}
+      <a href={UNSPLASH_URL} target="_blank" rel="noreferrer">Unsplash</a>
+    </p>
+  );
+}
+
 export function Ticks({ count, index }: { count: number; index: number }) {
   return (
     <div className="ticks" aria-hidden="true">
@@ -161,6 +174,7 @@ export const CreatorCard = forwardRef<HTMLElement, Props>(function CreatorCard(
         <Frames creator={creator} index={index} loadAll={near} />
         <Ticks count={count} index={index} />
       </div>
+      <PhotoCredit creator={creator} />
 
       <div className="who">
         <div className="who-top">

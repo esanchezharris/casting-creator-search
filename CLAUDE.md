@@ -41,7 +41,7 @@ three stages. It does not crawl social platforms for strangers.
     npm run dev      # http://localhost:3000
     npm run build    # must pass before you call anything done
     npm run seed     # regenerate data/creators.json (120 fictional creators, seed 11)
-    npm run embed    # needs OPENAI_API_KEY; writes data/embeddings.json
+    npm run embed    # needs OPENAI_API_KEY; writes data/embeddings.json (rerun after a reseed)
     npm run eval     # needs the app running; prints parser + P@5 scores
 
 ## How it works
@@ -60,24 +60,34 @@ three stages. It does not crawl social platforms for strangers.
 - `scripts/`: Python, standard library only. Keep it that way.
 
 ## State of things
-Verified working (20 Nov 2026, rule parser + keyword ranking, no keys): build,
-pipeline model (stage, partner, audience, reach, notes, roster-only rate),
-roster-first grouping, chips with editors and "Add filter", scrub preview,
-quick look, shortlist with localStorage and copy text, keyboard nav, eval with
-recall and a held-out set. Numbers and known misses are in docs/EVAL.md
-(tuned 46/46 filters, P@5 0.88, recall 0.77; held out 7/10, 0.80, 0.80).
+Everything below was run on 20 Nov 2026.
+
+Keys: there is no `.env.local`, but `OPENAI_API_KEY` and `UNSPLASH_ACCESS_KEY`
+are exported in Emilio's shell. So `npm run dev` on his machine runs the LLM
+parser and the embedding ranker by default. Force the baseline with
+`PARSER=rules RANKER=keywords`.
+
+Working and measured: pipeline model (stage, partner, audience, reach, notes,
+roster-only rate), roster-first grouping, both parsers, both rankers,
+`scripts/embed.py`, chips with editors and "Add filter", scrub preview, quick
+look, shortlist with localStorage and copy text, keyboard nav, eval with
+recall and a held-out set in all four parser/ranker modes. Numbers, how both
+cutoffs were chosen and every known miss are in docs/EVAL.md. Short version:
+rules + keywords is the most precise on this data (P@5 0.88 tuned, 0.80 held
+out); embeddings win on paraphrase but cannot return "nobody" and miss
+"runners who review shoes".
+
+Photos: `scripts/fetch_images.py` uses Unsplash. 7 of 120 creators have a
+photo set; the rest have `images: []` and the UI draws placeholder frames. Two
+of the seven sets may show more than one person (Jade Santos, Camila Thorne).
+Rerun with `--pages 4` (50 requests an hour, responses cached) for more.
+`npm run seed` wipes photos.
 
 Checked in a browser at 1440px and 390px. Not checked: touch drag on a real
-touch screen, and photo preloading (there are no photos to load).
+touch screen.
 
-Never run (no API keys were available), so expect bugs:
-- `parseWithLLM` in `src/lib/parse.ts`
-- `rankByEmbeddings` in `src/lib/search.ts` and `scripts/embed.py`. It also
-  has no relevance cutoff yet; the keyword ranker does (KEYWORD_CUTOFF).
-- `scripts/fetch_images.py` (Pexels, which stopped issuing keys). Every
-  creator has `images: []` and the UI draws placeholder frames.
-Default model names in `.env.example` may be out of date. Check the provider's
-current docs before assuming a name is valid.
+Not built: a hybrid ranker (keywords to decide if anyone fits, embeddings to
+reorder), which docs/EVAL.md argues is the next step.
 
 Port 3000 is often taken on Emilio's machine. `npx next dev --port 3210` and
 `npm run eval -- --url http://localhost:3210` work.
@@ -107,8 +117,9 @@ Readability beats style every time.
 ## Hard constraints
 - All creators are fictional. Do not scrape Instagram or any social platform,
   and do not use real creators' names, handles or photos.
-- Photos come from Pexels via `scripts/fetch_images.py` or stay as
-  placeholders. The UI must say the roster is fictional.
+- Photos come from Unsplash via `scripts/fetch_images.py` (hotlinked and
+  credited, per their API guidelines) or stay as placeholders. The UI must say
+  the roster is fictional and that the people in the photos are not the creators.
 - Never invent eval numbers. Every figure in docs must come from a run you
   actually did, with the mode (parser, ranker) stated.
 - Do not commit `.env.local` or print keys.
