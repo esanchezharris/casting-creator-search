@@ -101,11 +101,13 @@ the demo briefs surface).
 `scripts/media_prompts.py` is the record of how they were asked for. Each
 creator gets a distinct look from a per-creator seed. Five of their six posts
 are illustrated, each from a hand-written scene for that caption (81 scenes),
-so the photo in quick look matches the post text beside it. The first photo is
-a clear portrait (Soul 2.0); the other four reuse it as a face reference (Nano
-Banana Pro); clips are five seconds with sound (Kling 4.0 Flash). Every image
-was looked at before it was kept; portraits with hidden faces, real logos,
-garbled text or a different-looking person were regenerated.
+so the photo in quick look matches the post text beside it. A first portrait
+fixes the face; the other photos reuse it as a face reference (Nano Banana
+Pro); clips are five seconds with sound (Kling 4.0 Flash). Every set was
+looked at on a contact sheet before it was kept. The first round of portraits
+(Soul 2.0) mostly failed that check, with app chrome drawn onto the image and
+garbled lettering on products, so all of them were regenerated from the same
+face with different wording; the script's docstring has the details.
 
 ## Layout
 

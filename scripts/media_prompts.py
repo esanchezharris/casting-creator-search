@@ -10,6 +10,22 @@ fictional roster. This script is the record of how they were asked for:
   - the first photo is a clear, well-lit portrait in the first scene; the
     other four reuse it as a face reference
 
+What the batch taught, and what was done about it (20 Nov 2026):
+
+  - The portrait prompts below went to Soul 2.0 and mostly failed. The words
+    "Instagram post", "phone", "selfie" and "tripod" made it draw app chrome
+    (username bars, borders, collages) onto the image, and any held product
+    came out with garbled lettering. The four scene prompts, sent to Nano
+    Banana Pro with a face reference, did not have these problems.
+  - So every first photo was regenerated on Nano Banana Pro from the same
+    scene and the same face, with wording that asks for one full-frame
+    photograph, a relaxed expression, an ordinary plain top and blank
+    packaging. Those are the 1.jpg files in public/creators/.
+  - Scenes that were flagged on review (a second person in frame, a logo,
+    a face that drifted, blotchy skin) were regenerated one by one with the
+    prompt reworded for that flaw. The prompts in data/media_prompts.json are
+    therefore the starting point, not a byte-exact record of every image.
+
     python3 scripts/media_prompts.py            # writes data/media_prompts.json
     python3 scripts/media_prompts.py --groups 6 OUTDIR   # also split into work files
 

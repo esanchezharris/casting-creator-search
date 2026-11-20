@@ -87,7 +87,12 @@ per creator). Files live in `public/creators/<id>/` (`1.jpg` to `5.jpg`,
 optional `clip.mp4`); `python3 scripts/apply_media.py` points
 `data/creators.json` at them and records which post each photo shows
 (`photoPosts`). Rerun it after `npm run seed`. Likes and top comments per post
-(`reactions`) come from the seed script.
+(`reactions`) come from the seed script. All 120 creators have five photos
+and 23 have a clip (20 Nov). Lesson from the batch: Soul 2.0 draws app chrome
+and garbled labels when the prompt says "Instagram", "phone" or "selfie";
+Nano Banana Pro with a face reference was reliable, so every photo 1 was
+redone that way. Every set was reviewed on contact sheets; known soft spots
+are in the docstring of `scripts/media_prompts.py`.
 
 UI: rebuilt on Tailwind 4 and shadcn (Base UI flavour) on 20 Nov. Components
 are in `src/components/ui`. Emil Kowalski's skills are installed in
