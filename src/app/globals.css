@@ -1,0 +1,167 @@
+/*
+  Design tokens. The look follows docs/reference/questionnaire.png:
+  warm paper ground, white rounded surfaces with a hairline border, a plain
+  grotesk for everything people read, mono capitals only for tiny status
+  labels and the primary button, black fill for "selected", one red dot.
+*/
+:root {
+  --ground: #edeae4;
+  --surface: #faf9f6;
+  --white: #ffffff;
+  --ink: #171715;
+  --muted: #6b6a66;
+  --line: #d9d6cf;
+  --red: #e5383b;
+  --sans: "Geist", "Inter", "Helvetica Neue", Arial, sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --serif: "Instrument Serif", Georgia, serif;
+  --r-lg: 18px;
+  --r-md: 12px;
+  --gutter: clamp(16px, 3vw, 40px);
+}
+
+* { box-sizing: border-box; }
+html { background: var(--ground); }
+body {
+  margin: 0; background: var(--ground); color: var(--ink);
+  font-family: var(--sans); font-size: 15px; line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: 0; padding: 0; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+.page { max-width: 1480px; margin: 0 auto; padding: var(--gutter); padding-bottom: 130px; }
+
+/* Mono capitals: status labels and the primary button only. */
+.label { font-family: var(--mono); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+
+/* ---------------------------------------------------------------- masthead */
+.masthead { display: flex; justify-content: space-between; align-items: center; }
+.masthead strong { font-family: var(--serif); font-style: italic; font-weight: 400; font-size: 28px; letter-spacing: -0.01em; }
+
+/* ------------------------------------------------------------------ search */
+.ask { margin-top: clamp(20px, 4vw, 44px); }
+.ask h1 { margin: 0 0 6px; font-size: clamp(28px, 3.4vw, 44px); font-weight: 500; letter-spacing: -0.025em; line-height: 1.1; }
+.ask > p { margin: 0 0 20px; color: var(--muted); font-size: 17px; }
+.ask-box {
+  display: flex; gap: 12px; align-items: stretch;
+  background: var(--white); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 10px;
+}
+.ask-box:focus-within { border-color: var(--ink); }
+.ask-box textarea {
+  flex: 1; min-width: 0; resize: none; overflow: hidden; border: 0; background: transparent;
+  padding: 12px 14px; font-size: 20px; font-weight: 500; line-height: 1.35;
+}
+.ask-box textarea::placeholder { color: #a9a7a1; font-weight: 400; }
+.ask-box textarea:focus { outline: none; }
+.go {
+  display: inline-flex; align-items: center; gap: 12px; padding: 0 28px; min-height: 52px;
+  background: var(--ink); color: var(--white); border-radius: var(--r-md);
+  font-family: var(--mono); font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase;
+}
+.go::after, .tray .go::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--red); }
+.examples { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.examples button {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
+  padding: 6px 14px; font-size: 14px; color: var(--muted); text-align: left;
+}
+.examples button:hover { color: var(--ink); border-color: var(--ink); }
+
+/* ------------------------------------------------------------------- chips */
+.reading { margin-top: 26px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 38px; }
+.reading > .label { margin-right: 6px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--white); border: 1px solid var(--line); border-radius: 999px;
+  padding: 6px 8px 6px 14px; font-size: 15px; font-weight: 500;
+}
+.chip em { font-style: normal; font-weight: 400; color: var(--muted); }
+.chip button { width: 22px; height: 22px; border-radius: 50%; color: var(--muted); line-height: 1; font-size: 17px; }
+.chip button:hover { background: var(--ink); color: var(--white); }
+
+/* ----------------------------------------------------------------- toolbar */
+.toolbar {
+  position: sticky; top: 0; z-index: 5; background: var(--ground);
+  display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
+  margin-top: 18px; padding: 12px 0; border-bottom: 1px solid var(--line);
+}
+.toolbar .count { font-size: 17px; font-weight: 500; }
+.toolbar .how { margin-left: 14px; color: var(--muted); font-size: 14px; }
+.sort { display: flex; gap: 4px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+.sort button { padding: 6px 14px; border-radius: 999px; font-size: 14px; color: var(--muted); }
+.sort button[aria-pressed="true"] { background: var(--ink); color: var(--white); }
+@media (max-width: 760px) { .toolbar .how { display: none; } }
+
+/* -------------------------------------------------------------------- grid */
+.sheet { display: grid; gap: 16px; margin-top: 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); }
+.empty { margin-top: 56px; max-width: 46ch; color: var(--muted); font-size: 17px; }
+.empty h2 { font-size: 28px; font-weight: 500; letter-spacing: -0.02em; color: var(--ink); margin: 0 0 8px; }
+
+/* -------------------------------------------------------------------- card */
+.card {
+  display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 10px; outline: none;
+}
+.card.focused { border-color: var(--ink); }
+.frame {
+  position: relative; aspect-ratio: 4 / 5; overflow: hidden; border-radius: var(--r-md); background: var(--line);
+  cursor: ew-resize; touch-action: pan-y; user-select: none;
+}
+.frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; pointer-events: none; -webkit-user-drag: none; }
+.frame img.on { opacity: 1; }
+.ticks { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; gap: 3px; opacity: 0; transition: opacity 0.12s; }
+.card:hover .ticks, .card.focused .ticks { opacity: 1; }
+.ticks i { flex: 1; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.5); box-shadow: 0 0 2px rgba(0, 0, 0, 0.25); }
+.ticks i.on { background: #fff; }
+
+.who { padding: 12px 6px 0; }
+.who h3 { margin: 0; font-size: 19px; font-weight: 500; letter-spacing: -0.015em; line-height: 1.2; }
+.who p { margin: 2px 0 0; font-size: 14px; color: var(--muted); }
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 6px 0; padding-top: 12px; border-top: 1px solid var(--line); }
+.facts div { font-size: 13px; color: var(--muted); }
+.facts b { display: block; font-size: 17px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+.why { margin: 12px 6px 0; font-size: 14px; line-height: 1.4; color: var(--ink); }
+.why span { display: block; color: var(--muted); font-size: 13px; }
+
+/* Shortlist control mirrors the questionnaire's answer rows: key badge, black when chosen. */
+.pick {
+  margin-top: auto; display: flex; align-items: center; gap: 12px; width: 100%;
+  background: var(--white); border: 1px solid var(--line); border-radius: var(--r-md);
+  padding: 10px 12px; font-size: 15px; font-weight: 500; text-align: left;
+}
+.card > .pick { margin-top: 14px; }
+.card > :nth-last-child(2) { margin-bottom: auto; }
+.pick:hover { border-color: var(--ink); }
+.pick kbd, .keys kbd {
+  display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 6px;
+  font-family: var(--mono); font-size: 12px; color: var(--muted);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+}
+.pick svg { margin-left: auto; opacity: 0; }
+.pick[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--white); }
+.pick[aria-pressed="true"] kbd { background: transparent; border-color: rgba(255, 255, 255, 0.4); color: var(--white); }
+.pick[aria-pressed="true"] svg { opacity: 1; }
+
+/* --------------------------------------------------------------- shortlist */
+.tray {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; z-index: 10;
+  width: min(1100px, calc(100% - 2 * var(--gutter)));
+  display: flex; align-items: center; gap: 8px 22px; flex-wrap: wrap;
+  background: var(--white); border: 1px solid var(--ink); border-radius: var(--r-lg); padding: 10px 10px 10px 20px;
+  box-shadow: 0 12px 40px rgba(23, 23, 21, 0.14);
+}
+.tray strong { font-size: 17px; font-weight: 500; }
+.tray span { color: var(--muted); }
+.tray .names { flex: 1; min-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tray .clear { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+.tray .go { min-height: 44px; padding: 0 20px; }
+
+.keys { margin-top: 44px; color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; }
+.keys span { display: inline-flex; align-items: center; gap: 5px; }
+
+@media (max-width: 640px) {
+  .ask-box { flex-direction: column; }
+  .tray .names { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
