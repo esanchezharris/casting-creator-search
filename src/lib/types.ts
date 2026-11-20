@@ -31,8 +31,8 @@ export type Creator = {
   captions: string[];
   notes: Note[];
   images: string[];
-  /** Set by scripts/fetch_images.py when the photos come from Unsplash. */
-  photoCredit?: { name: string; url: string };
+  /** A short clip shown in quick look. Photos and clips are AI-generated stand-ins (scripts/apply_media.py). */
+  video?: string;
 };
 
 export type LocationFilter = {

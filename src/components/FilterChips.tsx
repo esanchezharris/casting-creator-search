@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { ChevronDown, Plus, X } from "lucide-react";
 import { compact } from "@/components/CreatorCard";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { NICHES, STAGES, type LocationFilter, type ParsedQuery, type Stage } from "@/lib/types";
 
 /** What the chips send back. A place added by hand is just its name; the server resolves it. */
@@ -34,50 +38,47 @@ export function parseCount(s: string): number | null {
   return v > 0 ? Math.round(v) : null;
 }
 
-function Popover({ label, onClose, children }: { label: string; onClose: () => void; children: React.ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    // The wrapper holds the trigger too, so clicking the trigger again is not an "outside" click.
-    const down = (e: PointerEvent) => { if (!ref.current?.parentElement?.contains(e.target as Node)) onClose(); };
-    const key = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); onClose(); } };
-    document.addEventListener("pointerdown", down);
-    document.addEventListener("keydown", key, true);
-    return () => { document.removeEventListener("pointerdown", down); document.removeEventListener("keydown", key, true); };
-  }, [onClose]);
-  return <div ref={ref} className="pop" role="dialog" aria-label={label}>{children}</div>;
-}
+const title = "text-[13px] text-muted-foreground";
+const field = "h-9 bg-secondary text-[15px]";
 
 function FollowersEditor({ q, apply }: { q: ParsedQuery; apply: (next: FilterEdit) => void }) {
   const [lo, setLo] = useState(q.minFollowers != null ? compact(q.minFollowers) : "");
   const [hi, setHi] = useState(q.maxFollowers != null ? compact(q.maxFollowers) : "");
   return (
-    <form onSubmit={(e) => { e.preventDefault(); apply({ ...q, minFollowers: parseCount(lo), maxFollowers: parseCount(hi) }); }}>
-      <p className="pop-title">Followers</p>
-      <div className="pop-row">
-        <label>From<input value={lo} onChange={(e) => setLo(e.target.value)} placeholder="Any" autoFocus /></label>
-        <label>To<input value={hi} onChange={(e) => setHi(e.target.value)} placeholder="Any" /></label>
+    <form className="grid gap-2.5" onSubmit={(e) => { e.preventDefault(); apply({ ...q, minFollowers: parseCount(lo), maxFollowers: parseCount(hi) }); }}>
+      <p className="font-medium">Followers</p>
+      <div className="grid grid-cols-2 gap-2">
+        <label className={title}>From<Input className={field} value={lo} onChange={(e) => setLo(e.target.value)} placeholder="Any" autoFocus /></label>
+        <label className={title}>To<Input className={field} value={hi} onChange={(e) => setHi(e.target.value)} placeholder="Any" /></label>
       </div>
-      <p className="pop-hint">Write 50K or 1.2M. Leave a box empty for no limit.</p>
-      <button className="go" type="submit">Apply</button>
+      <p className={title}>Write 50K or 1.2M. Leave a box empty for no limit.</p>
+      <Button type="submit" className="press h-9">Apply</Button>
     </form>
   );
 }
 
-function PercentEditor({ title, hint, value, apply }: { title: string; hint: string; value: number | null; apply: (v: number | null) => void }) {
+function PercentEditor({ name, hint, value, apply }: { name: string; hint: string; value: number | null; apply: (v: number | null) => void }) {
   const [text, setText] = useState(value != null ? String(value) : "");
   return (
-    <form onSubmit={(e) => { e.preventDefault(); const v = parseFloat(text); apply(isFinite(v) && v > 0 ? Math.min(100, v) : null); }}>
-      <p className="pop-title">{title}</p>
-      <div className="pop-row">
-        <label>At least<span className="pct"><input value={text} onChange={(e) => setText(e.target.value)} inputMode="decimal" placeholder="Any" autoFocus />%</span></label>
-      </div>
-      <p className="pop-hint">{hint}</p>
-      <button className="go" type="submit">Apply</button>
+    <form className="grid gap-2.5" onSubmit={(e) => { e.preventDefault(); const v = parseFloat(text); apply(isFinite(v) && v > 0 ? Math.min(100, v) : null); }}>
+      <p className="font-medium">{name}</p>
+      <label className={title}>
+        At least
+        <span className="flex items-center gap-2 text-[15px] text-foreground">
+          <Input className={field} value={text} onChange={(e) => setText(e.target.value)} inputMode="decimal" placeholder="Any" autoFocus />%
+        </span>
+      </label>
+      <p className={title}>{hint}</p>
+      <Button type="submit" className="press h-9">Apply</Button>
     </form>
   );
 }
 
-type Open = "followers" | "engagement" | "audience" | "add" | null;
+type Kind = "followers" | "engagement" | "audience";
+
+const chip = "inline-flex h-8 items-center rounded-full border bg-card text-[14px] whitespace-nowrap";
+const remove = "press mr-1 grid size-6 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground";
+const option = "press h-7 rounded-full border bg-secondary px-2.5 text-[13px] hover:border-foreground";
 
 /**
  * The parsed query as chips. Every chip can be removed; the number chips open a
@@ -85,93 +86,106 @@ type Open = "followers" | "engagement" | "audience" | "add" | null;
  * without retyping the brief. Every change goes back out through `onChange`.
  */
 export function FilterChips({ parsed: q, places, onChange }: { parsed: ParsedQuery; places: string[]; onChange: (next: FilterEdit) => void }) {
-  const [open, setOpen] = useState<Open>(null);
+  // Which popover is open: a number chip's editor, or the Add menu (optionally showing a number editor).
+  const [open, setOpen] = useState<Kind | "add" | null>(null);
+  const [adding, setAdding] = useState<Kind | null>(null);
   const [place, setPlace] = useState("");
-  const close = () => setOpen(null);
-  const apply = (next: FilterEdit) => { setOpen(null); setPlace(""); onChange(next); };
+  const apply = (next: FilterEdit) => { setOpen(null); setAdding(null); setPlace(""); onChange(next); };
 
-  const hasFollowers = q.minFollowers != null || q.maxFollowers != null;
+  const has = {
+    followers: q.minFollowers != null || q.maxFollowers != null,
+    engagement: q.minEngagement != null,
+    audience: q.minAudienceUS != null,
+  };
   const editors = {
     followers: <FollowersEditor q={q} apply={apply} />,
-    engagement: <PercentEditor title="Engagement rate" hint="Likes, comments, saves and shares as a share of followers." value={q.minEngagement} apply={(v) => apply({ ...q, minEngagement: v })} />,
-    audience: <PercentEditor title="US audience" hint="Share of followers in the US, wherever the creator lives." value={q.minAudienceUS} apply={(v) => apply({ ...q, minAudienceUS: v == null ? null : Math.round(v) })} />,
+    engagement: <PercentEditor name="Engagement rate" hint="Likes, comments, saves and shares as a share of followers." value={q.minEngagement} apply={(v) => apply({ ...q, minEngagement: v })} />,
+    audience: <PercentEditor name="US audience" hint="Share of followers in the US, wherever the creator lives." value={q.minAudienceUS} apply={(v) => apply({ ...q, minAudienceUS: v == null ? null : Math.round(v) })} />,
   };
-  const has = { followers: hasFollowers, engagement: q.minEngagement != null, audience: q.minAudienceUS != null };
 
-  const plain = (key: string, label: React.ReactNode, remove: FilterEdit) => (
-    <span key={key} className="chip">
-      <span>{label}</span>
-      <button className="x" aria-label="Remove this filter" onClick={() => apply(remove)}>×</button>
+  const dim = (s: string) => <span className="text-muted-foreground">{s}</span>;
+  const plain = (key: string, label: React.ReactNode, without: FilterEdit) => (
+    <span key={key} className={chip}>
+      <span className="pr-1.5 pl-3">{label}</span>
+      <button className={remove} aria-label="Remove this filter" onClick={() => apply(without)}><X className="size-3.5" /></button>
     </span>
   );
-  const editable = (kind: "followers" | "engagement" | "audience", label: React.ReactNode, remove: FilterEdit) => (
-    <span key={kind} className="chip-wrap">
-      <span className="chip">
-        <button className="edit" aria-expanded={open === kind} title="Change" onClick={() => setOpen(open === kind ? null : kind)}>
-          {label}
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        </button>
-        <button className="x" aria-label="Remove this filter" onClick={() => apply(remove)}>×</button>
-      </span>
-      {open === kind && <Popover label="Change this filter" onClose={close}>{editors[kind]}</Popover>}
+  const editable = (kind: Kind, label: React.ReactNode, without: FilterEdit) => (
+    <span key={kind} className={chip}>
+      <Popover open={open === kind} onOpenChange={(o) => setOpen(o ? kind : null)}>
+        <PopoverTrigger render={<button className="flex h-full items-center gap-1.5 rounded-l-full pr-1.5 pl-3" title="Change" />}>
+          <span>{label}</span><ChevronDown className="size-3.5 text-muted-foreground" />
+        </PopoverTrigger>
+        <PopoverContent align="start" sideOffset={8} className="w-72 p-3.5 text-[15px]">{editors[kind]}</PopoverContent>
+      </Popover>
+      <button className={remove} aria-label="Remove this filter" onClick={() => apply(without)}><X className="size-3.5" /></button>
     </span>
   );
 
-  const any = q.niches.length || q.locations.length || q.stages.length || hasFollowers || has.engagement || has.audience || q.semantic;
+  const any = q.niches.length || q.locations.length || q.stages.length || has.followers || has.engagement || has.audience || q.semantic;
   const freeNiches = NICHES.filter((n) => !q.niches.includes(n));
   const freeStages = STAGES.filter((s) => !q.stages.includes(s));
   const typed = place.trim().toLowerCase();
   const freePlaces = places
     .filter((p) => !q.locations.some((l) => l.label === p) && (!typed || p.toLowerCase().includes(typed)))
     .slice(0, typed ? 8 : 6);
-  // A number filter with no chip yet is edited from under the Add button.
-  const fromAdd = open && open !== "add" && !has[open] ? open : null;
 
   return (
-    <div className="reading" aria-live="polite">
-      <span className="label">{any ? "Read as" : "Filters"}</span>
+    <div className="flex min-h-8 flex-wrap items-center gap-1.5" aria-live="polite">
+      {any ? <span className="mr-1 text-[13px] text-muted-foreground">Read as</span> : null}
       {q.stages.map((s) => plain(`st-${s}`, STAGE_CHIP[s], { ...q, stages: q.stages.filter((x) => x !== s) }))}
       {q.niches.map((n) => plain(`n-${n}`, n, { ...q, niches: q.niches.filter((x) => x !== n) }))}
-      {q.locations.map((l) => plain(`l-${l.field}-${l.value}`, <><em>in</em> {l.label}</>, { ...q, locations: q.locations.filter((x) => x !== l) }))}
-      {hasFollowers && editable("followers", <>{followerText(q)} <em>followers</em></>, { ...q, minFollowers: null, maxFollowers: null })}
-      {has.engagement && editable("engagement", <>{q.minEngagement}%+ <em>engagement</em></>, { ...q, minEngagement: null })}
-      {has.audience && editable("audience", <>{q.minAudienceUS}%+ <em>US audience</em></>, { ...q, minAudienceUS: null })}
-      {q.semantic && plain("s", <><em>posts about</em> {q.semantic}</>, { ...q, semantic: "" })}
+      {q.locations.map((l) => plain(`l-${l.field}-${l.value}`, <>{dim("in")} {l.label}</>, { ...q, locations: q.locations.filter((x) => x !== l) }))}
+      {has.followers && editable("followers", <>{followerText(q)} {dim("followers")}</>, { ...q, minFollowers: null, maxFollowers: null })}
+      {has.engagement && editable("engagement", <>{q.minEngagement}%+ {dim("engagement")}</>, { ...q, minEngagement: null })}
+      {has.audience && editable("audience", <>{q.minAudienceUS}%+ {dim("US audience")}</>, { ...q, minAudienceUS: null })}
+      {q.semantic && plain("s", <>{dim("posts about")} {q.semantic}</>, { ...q, semantic: "" })}
 
-      <span className="chip-wrap">
-        <button className="add" aria-expanded={open === "add"} onClick={() => setOpen(open === "add" ? null : "add")}>
-          <span aria-hidden="true">+</span> Add filter
-        </button>
-        {fromAdd && <Popover label="Add a filter" onClose={close}>{editors[fromAdd]}</Popover>}
-        {open === "add" && (
-          <Popover label="Add a filter" onClose={close}>
-            {freeNiches.length > 0 && <>
-              <p className="pop-title">Creator type</p>
-              <div className="opts">
-                {freeNiches.map((n) => <button key={n} onClick={() => apply({ ...q, niches: [...q.niches, n] })}>{n}</button>)}
+      <Popover open={open === "add"} onOpenChange={(o) => { setOpen(o ? "add" : null); if (!o) setAdding(null); }}>
+        <PopoverTrigger render={<Button variant="ghost" size="sm" className="press h-8 gap-1 rounded-full px-2.5 text-[14px] text-muted-foreground" />}>
+          <Plus className="size-4" /> Add filter
+        </PopoverTrigger>
+        <PopoverContent align="start" sideOffset={8} className="w-80 gap-0 p-3.5 text-[15px]">
+          {adding ? editors[adding] : (
+            <div className="grid gap-3.5">
+              {freeNiches.length > 0 && (
+                <div className="grid gap-1.5">
+                  <p className={title}>Creator type</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {freeNiches.map((n) => <button key={n} className={option} onClick={() => apply({ ...q, niches: [...q.niches, n] })}>{n}</button>)}
+                  </div>
+                </div>
+              )}
+              <div className="grid gap-1.5">
+                <p className={title}>Where the creator lives</p>
+                <Input className={field} value={place} onChange={(e) => setPlace(e.target.value)} placeholder="City, state or country" aria-label="Find a place" />
+                <div className="flex flex-wrap gap-1.5">
+                  {freePlaces.map((p) => <button key={p} className={option} onClick={() => apply({ ...q, locations: [...q.locations, p] })}>{p}</button>)}
+                  {freePlaces.length === 0 && <span className={title}>No creators there in this demo.</span>}
+                </div>
               </div>
-            </>}
-            <p className="pop-title">Where the creator lives</p>
-            <input value={place} onChange={(e) => setPlace(e.target.value)} placeholder="City, state or country" aria-label="Find a place" />
-            <div className="opts">
-              {freePlaces.map((p) => <button key={p} onClick={() => apply({ ...q, locations: [...q.locations, p] })}>{p}</button>)}
-              {freePlaces.length === 0 && <span className="pop-hint">No creators there in this demo.</span>}
+              {freeStages.length > 0 && (
+                <div className="grid gap-1.5">
+                  <p className={title}>Pipeline stage</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {freeStages.map((s) => <button key={s} className={option} onClick={() => apply({ ...q, stages: [...q.stages, s] })}>{STAGE_CHIP[s]}</button>)}
+                  </div>
+                </div>
+              )}
+              {(!has.followers || !has.engagement || !has.audience) && (
+                <div className="grid gap-1.5">
+                  <p className={title}>Numbers</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {!has.followers && <button className={option} onClick={() => setAdding("followers")}>followers</button>}
+                    {!has.engagement && <button className={option} onClick={() => setAdding("engagement")}>engagement</button>}
+                    {!has.audience && <button className={option} onClick={() => setAdding("audience")}>US audience</button>}
+                  </div>
+                </div>
+              )}
             </div>
-            <p className="pop-title">Pipeline stage</p>
-            <div className="opts">
-              {freeStages.map((s) => <button key={s} onClick={() => apply({ ...q, stages: [...q.stages, s] })}>{STAGE_CHIP[s]}</button>)}
-            </div>
-            {(!has.followers || !has.engagement || !has.audience) && <>
-              <p className="pop-title">Numbers</p>
-              <div className="opts">
-                {!has.followers && <button onClick={() => setOpen("followers")}>followers</button>}
-                {!has.engagement && <button onClick={() => setOpen("engagement")}>engagement</button>}
-                {!has.audience && <button onClick={() => setOpen("audience")}>US audience</button>}
-              </div>
-            </>}
-          </Popover>
-        )}
-      </span>
+          )}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

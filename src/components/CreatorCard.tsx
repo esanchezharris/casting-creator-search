@@ -1,6 +1,11 @@
 "use client";
 
 import { forwardRef, useEffect, useRef, useState } from "react";
+import { Check, Plus, TriangleAlert } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Kbd } from "@/components/ui/kbd";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import type { Creator, SearchResult, Stage } from "@/lib/types";
 
 export const compact = (n: number) =>
@@ -9,11 +14,12 @@ export const compact = (n: number) =>
   : String(n);
 export const money = (n: number) => `$${n.toLocaleString("en-US")}`;
 export const placeOf = (c: Creator) => [c.city, c.region || c.country].filter(Boolean).join(", ");
+export const nichesOf = (c: Creator) => c.niches.map((x) => x[0].toUpperCase() + x.slice(1)).join(" and ");
 export const STAGE_LABEL: Record<Stage, string> = { roster: "Roster", applicant: "Applicant", prospect: "Prospect" };
 
 /** Every profile shows this many frames, whether they are photos or placeholders. */
 export const FRAME_COUNT = 5;
-const initials = (name: string) => name.split(" ").map((w) => w[0]).join("").slice(0, 2);
+export const initials = (name: string) => name.split(" ").map((w) => w[0]).join("").slice(0, 2);
 const isTyping = (t: EventTarget | null) =>
   t instanceof HTMLTextAreaElement || t instanceof HTMLInputElement || t instanceof HTMLSelectElement;
 
@@ -85,50 +91,48 @@ export function Frames({ creator, index, loadAll }: { creator: Creator; index: n
   );
 }
 
-export const UNSPLASH_URL = "https://unsplash.com/?utm_source=casting_demo&utm_medium=referral";
-
-/** Unsplash asks for the photographer and Unsplash to be credited, with links, wherever a photo shows. */
-export function PhotoCredit({ creator }: { creator: Creator }) {
-  if (!creator.photoCredit) return null;
+export function Ticks({ count, index, show }: { count: number; index: number; show?: boolean }) {
   return (
-    <p className="credit">
-      Photos by <a href={creator.photoCredit.url} target="_blank" rel="noreferrer">{creator.photoCredit.name}</a> on{" "}
-      <a href={UNSPLASH_URL} target="_blank" rel="noreferrer">Unsplash</a>
-    </p>
-  );
-}
-
-export function Ticks({ count, index }: { count: number; index: number }) {
-  return (
-    <div className="ticks" aria-hidden="true">
+    <div className={cn("ticks", show && "show")} aria-hidden="true">
       {Array.from({ length: count }, (_, i) => <i key={i} className={i === index ? "on" : ""} />)}
     </div>
   );
 }
 
-/** The four numbers a talent partner reads first. */
-export function Facts({ creator }: { creator: Creator }) {
+export function StageBadge({ stage }: { stage: Stage }) {
   return (
-    <div className="facts">
-      <div><b>{compact(creator.recentReach)}</b>recent reach</div>
-      <div><b>{creator.engagement}%</b>engagement</div>
-      <div><b>{creator.audience.us}%</b>US audience</div>
-      {creator.rate != null
-        ? <div><b>{money(creator.rate)}</b>per reel</div>
-        : <div><b>No rate yet</b>not signed</div>}
-    </div>
+    <Badge variant={stage === "roster" ? "secondary" : "outline"} className={cn("h-[22px] px-2 text-[13px] font-normal", stage === "roster" ? "bg-muted" : "border-foreground/40")}>
+      {STAGE_LABEL[stage]}
+    </Badge>
   );
 }
 
-export function PickButton({ picked, onPick }: { picked: boolean; onPick: () => void }) {
+/** The four numbers a talent partner reads first. */
+export function Facts({ creator, className }: { creator: Creator; className?: string }) {
+  const facts: [string, string][] = [
+    [compact(creator.recentReach), "reach"],
+    [`${creator.engagement}%`, "engaged"],
+    [`${creator.audience.us}%`, "US"],
+    creator.rate != null ? [money(creator.rate), "a reel"] : ["None", "no rate"],
+  ];
   return (
-    <button className="pick" onClick={onPick} aria-pressed={picked}>
-      <kbd>S</kbd>
-      {picked ? "Shortlisted" : "Shortlist"}
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-        <path d="M3.5 9.5l3.5 3.5 7.5-8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </button>
+    <dl className={cn("grid grid-cols-4 gap-2", className)}>
+      {facts.map(([value, label]) => (
+        <div key={label} className="min-w-0">
+          <dd className="truncate text-[15px] font-medium tabular-nums">{value}</dd>
+          <dt className="truncate text-[13px] text-muted-foreground">{label}</dt>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+export function Warning({ text, className }: { text: string; className?: string }) {
+  return (
+    <p className={cn("flex gap-2 rounded-lg border bg-card px-2.5 py-2 text-[13px] leading-snug", className)}>
+      <TriangleAlert className="mt-px size-4 shrink-0" aria-hidden="true" />
+      <span><span className="font-medium">Check before pitching.</span> {text}</span>
+    </p>
   );
 }
 
@@ -152,6 +156,7 @@ export const CreatorCard = forwardRef<HTMLElement, Props>(function CreatorCard(
   // about a row of the viewport, so the first sweep never lands on a blank frame.
   const [near, setNear] = useState(false);
   const el = useRef<HTMLElement | null>(null);
+  const downX = useRef(0);
   useEffect(() => {
     if (!el.current || near || !("IntersectionObserver" in window)) return;
     const io = new IntersectionObserver(
@@ -166,33 +171,63 @@ export const CreatorCard = forwardRef<HTMLElement, Props>(function CreatorCard(
     <article
       ref={(node) => { el.current = node; if (typeof ref === "function") ref(node); else if (ref) ref.current = node; }}
       tabIndex={-1}
-      className={`card${picked ? " picked" : ""}${focused ? " focused" : ""}`}
+      data-card
+      className={cn(
+        "group/card flex flex-col rounded-[22px] border border-transparent p-2 outline-none transition-colors duration-150",
+        focused && "border-border bg-card",
+      )}
       onPointerEnter={(e) => { setNear(true); if (e.pointerType === "mouse") onFocus(); }}
       aria-label={`${creator.name}, ${STAGE_LABEL[creator.stage]}, ${compact(creator.recentReach)} recent reach, ${placeOf(creator)}`}
     >
-      <div className="frame" {...bind}>
-        <Frames creator={creator} index={index} loadAll={near} />
-        <Ticks count={count} index={index} />
-      </div>
-      <PhotoCredit creator={creator} />
-
-      <div className="who">
-        <div className="who-top">
-          <h3><button onClick={onOpen} title="Quick look (Space)">{creator.name}</button></h3>
-          <span className={`badge ${creator.stage}`}>{STAGE_LABEL[creator.stage]}</span>
+      <div className="relative">
+        {/* A click opens quick look; a sideways drag on a touch screen is a scrub, not a click. */}
+        <div
+          className="frame" {...bind}
+          onPointerDownCapture={(e) => { downX.current = e.clientX; }}
+          onClick={(e) => { if (Math.abs(e.clientX - downX.current) < 8) onOpen(); }}
+        >
+          <Frames creator={creator} index={index} loadAll={near} />
+          <Ticks count={count} index={index} show={focused} />
         </div>
-        <p>{creator.handle} · {placeOf(creator)}</p>
-        <p>
-          {creator.niches.map((x) => x[0].toUpperCase() + x.slice(1)).join(" and ")}
-          {" · "}
-          {creator.partner ? `Partner: ${creator.partner}` : "No talent partner yet"}
-        </p>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <button
+                onClick={onPick}
+                aria-pressed={picked}
+                aria-label={picked ? `Remove ${creator.name} from the shortlist` : `Add ${creator.name} to the shortlist`}
+                className={cn(
+                  "press absolute top-2.5 right-2.5 grid size-9 place-items-center rounded-full",
+                  picked
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-card/90 text-foreground backdrop-blur-sm hover:bg-card [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/card:opacity-100 focus-visible:opacity-100",
+                  focused && "opacity-100!",
+                )}
+              />
+            }
+          >
+            {picked ? <Check className="size-[18px]" /> : <Plus className="size-[18px]" />}
+          </TooltipTrigger>
+          <TooltipContent>{picked ? "Shortlisted" : "Shortlist"} <Kbd>S</Kbd></TooltipContent>
+        </Tooltip>
       </div>
-      <Facts creator={creator} />
-      {warning && <p className="warn"><span>Check before pitching</span>{warning}</p>}
-      {reason && <p className="why"><span>Why this match</span>{reason}</p>}
 
-      <PickButton picked={picked} onPick={onPick} />
+      <div className="flex flex-1 flex-col px-1.5 pt-3 pb-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="min-w-0 text-[16px] leading-tight font-medium tracking-[-0.01em]">
+            <button onClick={onOpen} className="max-w-full truncate text-left underline-offset-4 hover:underline">
+              {creator.name}
+            </button>
+          </h3>
+          <StageBadge stage={creator.stage} />
+        </div>
+        <p className="mt-0.5 truncate text-[13px] text-muted-foreground">{nichesOf(creator)} · {placeOf(creator)}</p>
+
+        <Facts creator={creator} className="mt-3" />
+
+        {warning && <Warning text={warning} className="mt-3" />}
+        {reason && <p className="mt-3 line-clamp-2 text-[13px] leading-snug text-muted-foreground">{reason}</p>}
+      </div>
     </article>
   );
 });

@@ -1,7 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CreatorCard, compact, money, UNSPLASH_URL } from "@/components/CreatorCard";
+import { ArrowUp, Copy } from "lucide-react";
+import { toast } from "sonner";
+import { CreatorCard, compact, initials, money } from "@/components/CreatorCard";
+import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { cn } from "@/lib/utils";
 import { FilterChips, summarize, type FilterEdit } from "@/components/FilterChips";
 import { QuickLook } from "@/components/QuickLook";
 import type { Creator, SearchResponse, SearchResult } from "@/lib/types";
@@ -61,7 +68,6 @@ export default function Page() {
   const [sort, setSort] = useState<Sort>("match");
   const [focus, setFocus] = useState(-1);
   const [looking, setLooking] = useState(false);
-  const [copied, setCopied] = useState<"" | "Copied" | "Copy failed">("");
   const [shortlist, setShortlist] = useState<Shortlist>({ brief: "", creators: [] });
   const [restored, setRestored] = useState(false);
 
@@ -150,7 +156,7 @@ export default function Page() {
         cards.current[next]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
       } else if (e.key === " ") {
         // On a button outside the grid, Space should press that button as usual.
-        if (t instanceof HTMLButtonElement && !t.closest(".card")) return;
+        if (t instanceof HTMLButtonElement && !t.closest("[data-card]")) return;
         e.preventDefault();
         if (focus < 0) { setFocus(0); setLooking(true); } else setLooking((v) => !v);
       } else if (e.key.toLowerCase() === "s" && focus >= 0) {
@@ -169,11 +175,10 @@ export default function Page() {
   const copyShortlist = async () => {
     try {
       await navigator.clipboard.writeText(shortlistText(shortlist));
-      setCopied("Copied");
+      toast.success("Shortlist copied", { description: "Paste it into an email to the brand." });
     } catch {
-      setCopied("Copy failed");
+      toast.error("Could not copy", { description: "The browser blocked the clipboard." });
     }
-    setTimeout(() => setCopied(""), 1600);
   };
 
   // Searching hands the keyboard to the grid, so arrows and S work without a click.
@@ -198,104 +203,144 @@ export default function Page() {
     />
   );
 
+  const grid = "grid grid-cols-[repeat(auto-fill,minmax(min(100%,236px),1fr))] gap-x-2 gap-y-6";
+
   return (
-    <main className={`page${open ? " looking" : ""}`}>
-      <header className="masthead">
-        <strong>Casting</strong>
-        <span className="label">Demo data · fictional creators</span>
+    <main className={cn("mx-auto max-w-[1440px] px-4 pb-36 sm:px-8", open && "lg:mr-0 lg:pr-[472px]")}>
+      <header className="flex h-16 items-center justify-between">
+        <span className="flex items-center gap-2 text-[17px] font-medium tracking-[-0.02em]">
+          <i className="size-2 rounded-full bg-destructive" aria-hidden="true" />Casting
+        </span>
+        <span className="text-[13px] text-muted-foreground">Demo data · every creator is fictional</span>
       </header>
 
-      <form className="ask" onSubmit={(e) => { e.preventDefault(); submit(query); }}>
-        <h1><label htmlFor="q">Who does the brief need?</label></h1>
-        <p>Describe them in a sentence. The roster is searched first; if it is thin, you also see who would be worth signing.</p>
-        <div className="ask-box">
+      <form className="mx-auto mt-6 max-w-3xl sm:mt-14" onSubmit={(e) => { e.preventDefault(); submit(query); }}>
+        <h1 className="text-center text-[30px] leading-[1.1] font-medium tracking-[-0.03em] text-balance sm:text-[40px]">
+          <label htmlFor="q">Who does the brief need?</label>
+        </h1>
+        <p className="mx-auto mt-3 max-w-xl text-center text-pretty text-muted-foreground">
+          Describe them in a sentence. The roster is searched first; if it is thin, you also see who would be worth signing.
+        </p>
+        <div className="mt-7 flex items-end gap-2 rounded-2xl border bg-card p-2 pl-4 shadow-[0_1px_2px_rgb(23_23_21/0.04)] transition-[border-color] duration-150 focus-within:border-foreground">
           <textarea
             id="q" ref={input} rows={1} value={query} autoFocus spellCheck={false}
             placeholder="Fitness creators who post about energy drinks"
+            className="min-w-0 flex-1 resize-none overflow-hidden bg-transparent py-2 text-[17px] leading-snug outline-none placeholder:text-muted-foreground/70"
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(query); } }}
           />
-          <button className="go" type="submit" aria-busy={loading}>Search</button>
+          <Button type="submit" size="icon" aria-label="Search" aria-busy={loading} className="press size-10 shrink-0 rounded-xl">
+            <ArrowUp className="size-5" />
+          </Button>
         </div>
-        <div className="examples">
-          {EXAMPLES.map((ex) => <button type="button" key={ex} onClick={() => { setQuery(ex); submit(ex); }}>{ex}</button>)}
+        <div className="-mx-4 mt-3 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:justify-center sm:px-0">
+          {EXAMPLES.map((ex) => (
+            <button
+              type="button" key={ex} onClick={() => { setQuery(ex); submit(ex); }}
+              className="press shrink-0 rounded-full border px-3 py-1 text-left text-[13px] text-muted-foreground hover:border-foreground hover:text-foreground"
+            >
+              {ex}
+            </button>
+          ))}
         </div>
       </form>
 
-      {data
-        ? <FilterChips parsed={data.parsed} places={data.places} onChange={(filters) => run({ filters })} />
-        : <div className="reading" />}
-
-      <div className="toolbar">
-        <div className="status" aria-live="polite">
-          {first && <span className="count">Loading the roster</span>}
-          {data && (
-            <span className="count">
-              {data.offRoster.length > 0
-                ? `${main.length} on the roster, ${off.length} not yet`
-                : `${main.length} ${main.length === 1 ? "creator" : "creators"}`}
-            </span>
-          )}
-          {data && loading && <span className="label busy">Searching</span>}
-          {data && !loading && hasFilters && (
-            <span className="how">{PARSER_LABEL[data.parser]}, {RANKER_LABEL[data.ranker]}, {data.tookMs} ms</span>
-          )}
+      <div className="sticky top-0 z-20 mt-10 border-b bg-background/85 py-3 backdrop-blur-md">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex min-h-8 items-baseline gap-3" aria-live="polite">
+            {first && <span className="font-medium">Loading the roster</span>}
+            {data && (
+              <span className="font-medium">
+                {data.offRoster.length > 0
+                  ? `${main.length} on the roster, ${off.length} not yet`
+                  : `${main.length} ${main.length === 1 ? "creator" : "creators"}`}
+              </span>
+            )}
+            {data && loading && <span className="text-[13px] text-muted-foreground">Searching…</span>}
+            {data && !loading && hasFilters && (
+              <span className="hidden text-[13px] text-muted-foreground md:inline">
+                {PARSER_LABEL[data.parser]}, {RANKER_LABEL[data.ranker]}, {data.tookMs} ms
+              </span>
+            )}
+          </div>
+          <div className="-mx-1 max-w-full overflow-x-auto px-1 [scrollbar-width:none]">
+            <ToggleGroup
+              aria-label="Sort by" value={[sort]} spacing={1}
+              onValueChange={(v) => { if (v[0]) setSort(v[0] as Sort); }}
+              className="rounded-full border bg-card p-0.5"
+            >
+              {SORTS.map(([key, label]) => (
+                <ToggleGroupItem
+                  key={key} value={key}
+                  className="h-7 rounded-full px-3 text-[13px] font-normal text-muted-foreground hover:bg-transparent aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+                >
+                  {label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
         </div>
-        <div className="sort" role="group" aria-label="Sort by">
-          {SORTS.map(([key, label]) => (
-            <button key={key} aria-pressed={sort === key} onClick={() => setSort(key)}>{label}</button>
-          ))}
-        </div>
+        {data && <div className="mt-2.5"><FilterChips parsed={data.parsed} places={data.places} onChange={(filters) => run({ filters })} /></div>}
       </div>
 
-      {error && <div className="empty"><h2>No answer from search</h2><p>{error}</p></div>}
+      {error && (
+        <div className="mt-14 max-w-md">
+          <h2 className="text-[22px] font-medium tracking-[-0.02em]">No answer from search</h2>
+          <p className="mt-1 text-muted-foreground">{error}</p>
+        </div>
+      )}
 
       {!error && !loading && data && all.length === 0 && (
-        <div className="empty">
-          <h2>Nobody fits all of that</h2>
-          <p>Not on the roster, and not among applicants or prospects. Remove a filter above to widen the search; the follower range and the topic are usually the tightest.</p>
+        <div className="mt-14 max-w-md">
+          <h2 className="text-[22px] font-medium tracking-[-0.02em]">Nobody fits all of that</h2>
+          <p className="mt-1 text-pretty text-muted-foreground">
+            Not on the roster, and not among applicants or prospects. Remove a filter above to widen the search; the follower range and the topic are usually the tightest.
+          </p>
         </div>
       )}
 
       {first && (
-        <div className="sheet" aria-hidden="true">
-          {Array.from({ length: 8 }, (_, i) => (
-            <div key={i} className="card skeleton"><div className="frame" /><i /><i /><i /></div>
+        <div className={cn(grid, "mt-4")} aria-hidden="true">
+          {Array.from({ length: 10 }, (_, i) => (
+            <div key={i} className="p-2">
+              <Skeleton className="aspect-[4/5] rounded-[17px]" />
+              <Skeleton className="mt-4 h-4 w-3/5" /><Skeleton className="mt-2 h-3.5 w-4/5" /><Skeleton className="mt-4 h-8 w-full" />
+            </div>
           ))}
         </div>
       )}
 
-      <div className={loading ? "results stale" : "results"}>
-        <div className="sheet" ref={sheet}>{main.map((r, i) => card(r, i))}</div>
+      <div className={cn("transition-opacity duration-150", loading && "pointer-events-none opacity-50")}>
+        <div className={cn(grid, "mt-4")} ref={sheet}>{main.map((r, i) => card(r, i))}</div>
 
         {off.length > 0 && (
-          <section className="group" aria-label="Not on the roster yet">
-            <h2>Not on the roster yet</h2>
-            <p>
+          <section className="mt-12 border-t pt-8" aria-label="Not on the roster yet">
+            <h2 className="text-[22px] font-medium tracking-[-0.02em]">Not on the roster yet</h2>
+            <p className="mt-1 max-w-2xl text-pretty text-muted-foreground">
               {main.length === 0 ? "Nobody on the roster fits this brief."
                 : `Only ${main.length} on the roster ${main.length === 1 ? "fits" : "fit"} this brief.`}
               {" "}These applicants and prospects do. They have no agreed rate and would need signing first.
             </p>
-            <div className="sheet">{off.map((r, i) => card(r, main.length + i))}</div>
+            <div className={cn(grid, "mt-5")}>{off.map((r, i) => card(r, main.length + i))}</div>
           </section>
         )}
       </div>
 
-      <p className="keys">
-        <span><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> move</span>
-        <span><kbd>Space</kbd> quick look</span>
-        <span><kbd>S</kbd> shortlist</span>
-        <span><kbd>,</kbd><kbd>.</kbd> flip photos</span>
-        <span><kbd>/</kbd> new search</span>
-        <span>Sweep or drag across a photo to flip through the profile</span>
-      </p>
-      <p className="fine">
-        Every creator, number and note on this page is fictional and generated for the demo.
-        {all.some((r) => r.creator.images.length > 0) && (
-          <> Photos from <a href={UNSPLASH_URL} target="_blank" rel="noreferrer">Unsplash</a>; the people in them are not these creators.</>
-        )}
-        {all.some((r) => r.creator.images.length === 0) && " Frames with initials are placeholders for profiles with no photos yet."}
-      </p>
+      <footer className="mt-16 border-t pt-5 text-[13px] text-muted-foreground">
+        <p className="hidden flex-wrap items-center gap-x-5 gap-y-2 sm:flex">
+          <span className="flex items-center gap-1"><Kbd>←</Kbd><Kbd>→</Kbd><Kbd>↑</Kbd><Kbd>↓</Kbd> move</span>
+          <span className="flex items-center gap-1"><Kbd>Space</Kbd> quick look</span>
+          <span className="flex items-center gap-1"><Kbd>S</Kbd> shortlist</span>
+          <span className="flex items-center gap-1"><Kbd>,</Kbd><Kbd>.</Kbd> flip photos</span>
+          <span className="flex items-center gap-1"><Kbd>/</Kbd> new search</span>
+          <span>Sweep across a photo to flip through the profile</span>
+        </p>
+        <p className="mt-4 max-w-3xl text-pretty">
+          Every creator, number and note here is fictional and made for this demo.
+          {all.some((r) => r.creator.images.length > 0) && " The photos and clips are AI-generated stand-ins; nobody in them is a real person."}
+          {all.some((r) => r.creator.images.length === 0) && " Frames with initials are placeholders for profiles with no photos yet."}
+        </p>
+      </footer>
 
       {open && (
         <QuickLook
@@ -309,16 +354,30 @@ export default function Page() {
       )}
 
       {shortlist.creators.length > 0 && (
-        <aside className="tray" aria-label="Shortlist">
-          <strong>{shortlist.creators.length} shortlisted</strong>
-          <span className="extra">{compact(shortlist.creators.reduce((s, c) => s + c.recentReach, 0))} combined reach</span>
-          <span className="extra">
-            {money(signed.reduce((s, c) => s + (c.rate ?? 0), 0))}
-            {unsigned > 0 && `, ${unsigned} to sign`}
-          </span>
-          <span className="names">{shortlist.creators.map((c) => c.name).join(", ")}</span>
-          <button className="clear" onClick={() => setShortlist({ brief: "", creators: [] })}>Clear</button>
-          <button className="go" onClick={copyShortlist}>{copied || "Copy shortlist"}</button>
+        <aside
+          aria-label="Shortlist"
+          className={cn(
+            "tray fixed bottom-4 left-1/2 z-40 flex w-[min(720px,calc(100%-24px))] -translate-x-1/2 items-center gap-3 rounded-2xl border bg-card py-2 pr-2 pl-3 shadow-[0_10px_36px_rgb(23_23_21/0.14)]",
+            open && "lg:left-[calc((100%-440px)/2)]",
+          )}
+        >
+          <div className="flex shrink-0 -space-x-2 max-sm:hidden">
+            {shortlist.creators.slice(0, 4).map((c) => (
+              <span key={c.id} className="grid size-8 place-items-center overflow-hidden rounded-full bg-muted text-[13px] ring-2 ring-card">
+                {c.images[0] ? <img src={c.images[0]} alt="" className="size-full object-cover" /> : initials(c.name)}
+              </span>
+            ))}
+          </div>
+          <p className="min-w-0 flex-1 truncate">
+            <span className="font-medium">{shortlist.creators.length} shortlisted</span>
+            <span className="hidden text-muted-foreground sm:inline">
+              {" · "}{compact(shortlist.creators.reduce((s, c) => s + c.recentReach, 0))} reach
+              {" · "}{money(signed.reduce((s, c) => s + (c.rate ?? 0), 0))}
+              {unsigned > 0 && ` · ${unsigned} to sign`}
+            </span>
+          </p>
+          <Button variant="ghost" className="press h-9 text-muted-foreground max-sm:px-2" onClick={() => setShortlist({ brief: "", creators: [] })}>Clear</Button>
+          <Button className="press h-9 gap-2 rounded-xl px-3.5" onClick={copyShortlist}><Copy /> Copy shortlist</Button>
         </aside>
       )}
     </main>

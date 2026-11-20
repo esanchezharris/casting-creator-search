@@ -77,11 +77,19 @@ rules + keywords is the most precise on this data (P@5 0.88 tuned, 0.80 held
 out); embeddings win on paraphrase but cannot return "nobody" and miss
 "runners who review shoes".
 
-Photos: `scripts/fetch_images.py` uses Unsplash. 7 of 120 creators have a
-photo set; the rest have `images: []` and the UI draws placeholder frames. Two
-of the seven sets may show more than one person (Jade Santos, Camila Thorne).
-Rerun with `--pages 4` (50 requests an hour, responses cached) for more.
-`npm run seed` wipes photos.
+Photos and clips: AI-generated on Higgsfield (Soul 2.0 for the first
+portrait, Nano Banana Pro with that portrait as a reference for four more
+scenes, Kling 4.0 Flash for a 5-second clip with sound). Files live in
+`public/creators/<id>/` (`1.jpg` to `5.jpg`, optional `clip.mp4`) and
+`python3 scripts/apply_media.py` points `data/creators.json` at them; rerun it
+after `npm run seed`. As of 20 Nov only a pilot of 4 creators is done (Jade
+Santos with a clip, Valentina Vargas, Felix Thorne, Priya Hayashi); the other
+116 show placeholder frames until Emilio approves the pilot. The old Unsplash
+script (`scripts/fetch_images.py`) is no longer used.
+
+UI: rebuilt on Tailwind 4 and shadcn (Base UI flavour) on 20 Nov. Components
+are in `src/components/ui`. Emil Kowalski's skills are installed in
+`.agents/skills` (read `emil-design-eng` before touching motion).
 
 Checked in a browser at 1440px and 390px. Not checked: touch drag on a real
 touch screen.
@@ -93,33 +101,36 @@ Port 3000 is often taken on Emilio's machine. `npx next dev --port 3210` and
 `npm run eval -- --url http://localhost:3210` work.
 
 ## Design rules
-The reference is `docs/reference/questionnaire.png`, a screen from the agency's
-own applicant questionnaire. Look at it before any UI work. Emilio rejected an
-earlier dark, high-contrast serif version as over-styled and hard to read.
+The palette reference is `docs/reference/questionnaire.png`, a screen from
+the agency's own applicant questionnaire. Emilio rejected a dark serif version as
+over-styled, and a second version (mono-caps buttons, key badges on every
+card) as looking vibe coded. The bar is a clean shadcn product UI.
 Readability beats style every time.
 
-- Tokens live at the top of `src/app/globals.css`. Use them; do not add colors.
-- Warm paper ground (#edeae4), near-white rounded surfaces, 1px warm-grey
-  borders, 12px and 18px radii.
-- One sans family (Geist) for everything people read. Headings are weight 500
-  with tight tracking, never bold, never serif.
-- Mono capitals (`.label`, `.go`) only for tiny status labels and primary
-  buttons. Not for body text, names or numbers.
-- "Selected" is a solid black fill with white text and a check, like the
-  chosen answer in the reference. Key badges (the small lettered squares) mark
-  keyboard shortcuts.
-- Exactly one accent: the small red dot on primary buttons. No gradients, no
-  extra shadows (the floating tray has the only one), no entrance animations.
+- Use the shadcn components in `src/components/ui` before writing anything by
+  hand. Tokens are the shadcn variables at the top of `src/app/globals.css`,
+  mapped to the warm palette. Do not add colors.
+- Warm paper ground (#edeae4), white surfaces, 1px warm-grey borders.
+- One sans family (Geist). Headings are weight 500 with tight tracking, never
+  bold, never serif. No mono capitals.
+- Cards are image-first with no chrome until focused. "Selected" is a solid
+  black fill with a check.
+- Exactly one accent: the small red dot beside the wordmark. No gradients.
+  The shortlist bar has the only real shadow.
+- Motion follows `.agents/skills/emil-design-eng`: pressables scale to 0.97,
+  popovers grow from their trigger, nothing that follows the keyboard or the
+  pointer (scrub, arrow keys, quick look) animates.
 - Body text 15px or larger, secondary text 13px minimum, contrast AA.
-- Inspired by their look, not a copy: never use the agency's wordmark, logo or name
-  in the UI. The masthead says "Casting".
+- Never use the agency's wordmark, logo or name in the UI. The masthead says
+  "Casting".
 
 ## Hard constraints
 - All creators are fictional. Do not scrape Instagram or any social platform,
   and do not use real creators' names, handles or photos.
-- Photos come from Unsplash via `scripts/fetch_images.py` (hotlinked and
-  credited, per their API guidelines) or stay as placeholders. The UI must say
-  the roster is fictional and that the people in the photos are not the creators.
+- Photos and clips are AI-generated stand-ins for fictional people. Never
+  prompt for a real person's name or likeness, and keep brand logos out. The
+  UI must say the roster is fictional and the media is AI-generated. Do not
+  call them "AI influencers" anywhere: the product is about real creators.
 - Never invent eval numbers. Every figure in docs must come from a run you
   actually did, with the mode (parser, ranker) stated.
 - Do not commit `.env.local` or print keys.
