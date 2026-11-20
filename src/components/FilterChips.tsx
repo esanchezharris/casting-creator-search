@@ -6,6 +6,7 @@ import { compact } from "@/components/CreatorCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { NICHES, STAGES, type LocationFilter, type ParsedQuery, type Stage } from "@/lib/types";
 
 /** What the chips send back. A place added by hand is just its name; the server resolves it. */
@@ -85,7 +86,7 @@ const option = "press h-7 rounded-full border bg-secondary px-2.5 text-[13px] ho
  * small editor; "Add filter" adds a creator type, place, stage or number
  * without retyping the brief. Every change goes back out through `onChange`.
  */
-export function FilterChips({ parsed: q, places, onChange }: { parsed: ParsedQuery; places: string[]; onChange: (next: FilterEdit) => void }) {
+export function FilterChips({ parsed: q, places, onChange, addClassName }: { parsed: ParsedQuery; places: string[]; onChange: (next: FilterEdit) => void; addClassName?: string }) {
   // Which popover is open: a number chip's editor, or the Add menu (optionally showing a number editor).
   const [open, setOpen] = useState<Kind | "add" | null>(null);
   const [adding, setAdding] = useState<Kind | null>(null);
@@ -132,7 +133,7 @@ export function FilterChips({ parsed: q, places, onChange }: { parsed: ParsedQue
 
   return (
     <div className="flex min-h-8 flex-wrap items-center gap-1.5" aria-live="polite">
-      {any ? <span className="mr-1 text-[13px] text-muted-foreground">Read as</span> : null}
+      <span className="mr-1 text-[13px] text-muted-foreground">{any ? "Read as" : "No filters"}</span>
       {q.stages.map((s) => plain(`st-${s}`, STAGE_CHIP[s], { ...q, stages: q.stages.filter((x) => x !== s) }))}
       {q.niches.map((n) => plain(`n-${n}`, n, { ...q, niches: q.niches.filter((x) => x !== n) }))}
       {q.locations.map((l) => plain(`l-${l.field}-${l.value}`, <>{dim("in")} {l.label}</>, { ...q, locations: q.locations.filter((x) => x !== l) }))}
@@ -142,7 +143,7 @@ export function FilterChips({ parsed: q, places, onChange }: { parsed: ParsedQue
       {q.semantic && plain("s", <>{dim("posts about")} {q.semantic}</>, { ...q, semantic: "" })}
 
       <Popover open={open === "add"} onOpenChange={(o) => { setOpen(o ? "add" : null); if (!o) setAdding(null); }}>
-        <PopoverTrigger render={<Button variant="ghost" size="sm" className="press h-8 gap-1 rounded-full px-2.5 text-[14px] text-muted-foreground" />}>
+        <PopoverTrigger render={<Button variant="ghost" size="sm" className={cn("press h-8 gap-1 rounded-full px-2.5 text-[14px] text-muted-foreground", addClassName)} />}>
           <Plus className="size-4" /> Add filter
         </PopoverTrigger>
         <PopoverContent align="start" sideOffset={8} className="w-80 gap-0 p-3.5 text-[15px]">

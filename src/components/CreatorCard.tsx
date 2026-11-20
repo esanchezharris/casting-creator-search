@@ -142,11 +142,12 @@ type Props = {
   focused: boolean;
   onPick: () => void;
   onFocus: () => void;
+  onLeave: () => void;
   onOpen: () => void;
 };
 
 export const CreatorCard = forwardRef<HTMLElement, Props>(function CreatorCard(
-  { result, picked, focused, onPick, onFocus, onOpen }, ref,
+  { result, picked, focused, onPick, onFocus, onLeave, onOpen }, ref,
 ) {
   const { creator, reason, warning } = result;
   const count = creator.images.length || FRAME_COUNT;
@@ -177,6 +178,8 @@ export const CreatorCard = forwardRef<HTMLElement, Props>(function CreatorCard(
         focused && "border-border bg-card",
       )}
       onPointerEnter={(e) => { setNear(true); if (e.pointerType === "mouse") onFocus(); }}
+      // The highlight follows the mouse: it leaves when the mouse does.
+      onPointerLeave={(e) => { if (e.pointerType === "mouse") onLeave(); }}
       aria-label={`${creator.name}, ${STAGE_LABEL[creator.stage]}, ${compact(creator.recentReach)} recent reach, ${placeOf(creator)}`}
     >
       <div className="relative">

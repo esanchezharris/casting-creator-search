@@ -31,6 +31,10 @@ export type Creator = {
   captions: string[];
   notes: Note[];
   images: string[];
+  /** Likes and top comments for each caption, in the same order. */
+  reactions: { likes: number; comments: { user: string; text: string }[] }[];
+  /** For each photo, the index of the caption it illustrates. */
+  photoPosts?: number[];
   /** A short clip shown in quick look. Photos and clips are AI-generated stand-ins (scripts/apply_media.py). */
   video?: string;
 };

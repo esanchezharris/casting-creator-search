@@ -301,11 +301,68 @@ def build(n: int, seed: int) -> list[dict]:
             "bio": f"{primary.capitalize()} creator in {city}. {TAGLINES[primary]}",
             "captions": caps,
             "notes": notes,
-            # Filled by scripts/fetch_images.py. Empty means the UI draws placeholders.
+            # Filled by scripts/apply_media.py. Empty means the UI draws placeholders.
             "images": [],
         })
 
+    add_reactions(creators)
     return creators
+
+
+# Top comments under each post, as a talent partner would see them on the
+# profile. Fictional commenters; written per niche so they read like replies
+# to that kind of post.
+COMMENTS = {
+    "fitness": ["ok this is the push I needed to go tonight", "form check please, do your knees track like that on purpose?",
+                "saving this for monday", "the honesty about what didn't work >>>", "what's the rep range on these?",
+                "you make 5am look reasonable and it is not", "tried this split for a month, can confirm", "link for the leggings??"],
+    "running": ["week nine club, my legs feel this", "which loop is this? looks flat and I need flat", "the pacing tip changed my long runs",
+                "needed to hear the no fancy watch part", "how are your knees holding up?", "signing up for my first 10K because of you",
+                "that jacket in rain is a bold claim, reporting back", "what gels are you using now?"],
+    "beauty": ["the placement tip, I've been doing it wrong for years", "shade name please!", "finally someone showing it after twelve hours",
+               "this is the realistic version I needed", "did it crease under the eyes at all?", "adding to cart against my better judgement",
+               "works on oily skin?", "the before and after is not even the same person"],
+    "skincare": ["my barrier thanks you", "how long before you saw a difference?", "is this ok for sensitive skin?", "the white cast test is all I ever wanted",
+                 "starting slow like you said, week two", "do you use it morning or night?", "this saved me from buying the expensive one",
+                 "can you do one for combination skin?"],
+    "hair": ["how long does it last on day two?", "the ribbon trick actually worked on my hair", "what size barrel is that?",
+             "my split ends are listening", "colour formula please, taking this to my stylist", "does it work on fine hair too?",
+             "wash day solidarity", "the shine!!"],
+    "fashion": ["the third outfit is the one", "where are the trousers from?", "twelve pieces and I still can't do this", "wearing this to the office tomorrow",
+                "need the sizing on the dress, I'm between two", "you make thrift finds look tailored", "the proportions are so good here",
+                "saving for my Europe packing list"],
+    "streetwear": ["the jersey with tailored trousers, noted", "what size are the cargos?", "retiring that pair is a crime", "the second jacket was robbed",
+                   "did you queue or get lucky online?", "cap number three is the one", "how do you get them that white again?", "fit is clean"],
+    "food": ["made this last night, zero leftovers", "what can I swap the salmon for?", "four times in a week is the only review I need",
+             "the receipt jump scare", "how long does it keep in the fridge?", "protein count per portion?", "my flatmates thank you",
+             "doing this for meal prep sunday"],
+    "wellness": ["the no phone part is the hard part", "which magnesium do you take?", "thirty days and you can see it in your shoulders",
+                 "did the cold ever get easier?", "trying the ten minute flow before work", "needed this on a sunday night",
+                 "honest review of the greens, thank you", "this is so calming to watch"],
+    "lifestyle": ["the windows!!", "how do you fit eight people in there?", "carry-on only is a personality at this point", "the weekly spend made me feel better about mine",
+                  "desk link? my back needs it", "sunday reset is my favourite genre", "what book is it?", "the chair, where is it from?"],
+}
+COMMENTER_A = ["sun", "late", "salt", "north", "tiny", "plain", "slow", "citrus", "paper", "velvet", "ginger", "quiet", "lucky", "rain", "olive", "maple"]
+COMMENTER_B = ["runs", "notes", "kitchen", "diaries", "studio", "lifts", "club", "edit", "daily", "house", "wears", "glow", "miles", "table", "files", "fits"]
+
+
+def add_reactions(creators: list[dict]) -> None:
+    """Likes and three top comments per post. Uses its own random stream per
+    creator, so adding this did not change any other generated field."""
+    niche_of = {cap: niche for niche, caps in CAPTIONS.items() for cap in caps}
+    for c in creators:
+        rnd = random.Random(f"reactions-{c['id']}")
+        c["reactions"] = []
+        for cap in c["captions"]:
+            likes = int(c["recentReach"] * c["engagement"] / 100 * rnd.uniform(0.6, 1.5))
+            texts = rnd.sample(COMMENTS[niche_of[cap]], 3)
+            c["reactions"].append({
+                "likes": max(likes, 12),
+                "comments": [
+                    {"user": f"{rnd.choice(COMMENTER_A)}{rnd.choice(['', '.', '_'])}{rnd.choice(COMMENTER_B)}{rnd.choice(['', '', str(rnd.randint(2, 98))])}", "text": t}
+                    for t in texts
+                ],
+            })
 
 
 def main() -> None:
