@@ -7,7 +7,11 @@ because one photographer's set is usually one shoot with one model, which
 makes five frames read as the same "creator". It is a heuristic: look through
 the grid afterwards and re-run or hand-fix any profile that mixes people.
 
-NOT TESTED against the live API (it was written offline). Check the first run.
+NOT TESTED against the live API (it was written offline), and Pexels was not
+issuing new API keys as of November 2026. Until this is rewritten for another
+source and run, creators have no photos and the UI draws labelled placeholder
+frames (initials and "1 of 5") instead. Search puts creators with the most
+photos first on the default screen, so real photo sets will surface on their own.
 """
 import json
 import os
