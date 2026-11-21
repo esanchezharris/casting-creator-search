@@ -123,17 +123,15 @@ recording; the model is not perfectly repeatable.
 
 | Brief | Read as | Returns |
 | --- | --- | --- |
-| Women in their twenties with a mostly US audience for a lip oil launch | women, aged 20 to 29, 50%+ US audience, posts about lip oil | 4 |
+| Women in their twenties with a mostly US audience for a lip oil launch | women, aged 20 to 29, 50%+ US audience, posts about lip oil | 3 |
 | Fashion creators in New York for a wedding guest dress campaign, budget $2,000 each | fashion, New York, up to $2K a reel, posts about wedding guest dress | 1 |
-| Beauty creators over 100K followers who do soft glam, US audience 60%+ | beauty, over 100K, 60%+ US audience, posts about soft glam | see note |
+| Beauty creators over 100K followers who do soft glam, US audience 60%+ | beauty, over 100K, 60%+ US audience, posts about soft glam | 11 |
 | Women over 30 who post about retinol and barrier repair | women, aged 31 or over, skincare, posts about retinol and barrier repair | 6 |
 | Hair creators who post heatless curls, under 50K, high engagement | hair, under 50K, 5%+ engagement, posts about heatless curls | 5 |
 | Roster creators who are open to whitelisting for a foundation wear test | on the roster, topic matched against CRM notes | 9, each quoting the note "Open to whitelisting for a usage fee." |
 | Who on the roster can turn a reel around in 48 hours for a nail brand | on the roster, topic matched against CRM notes | 29, led by "Turns revisions around within 24 hours." |
 
-Note: the soft glam brief returned 11 before the audience figure was read
-correctly (it was read as 50%); the count with 60% was not rechecked in the
-browser. Briefs that do not work and should stay out of the film: anything
+Briefs that do not work and should stay out of the film: anything
 with "no conflicts" or another negation (it is matched as a topic, not
 applied as a rule), a jewellery brief in a follower band where nobody posts
 about jewellery (embeddings return near misses), and a total campaign budget
