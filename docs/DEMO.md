@@ -14,9 +14,12 @@ The LLM is not perfectly repeatable, so run each brief once before recording.
 ## Before you record
 
 - `npm run dev`, open the page at 1440px wide, clear any old shortlist.
-- Every profile has five AI-generated photos, and the creators these briefs
-  surface also have a short clip in quick look. The clip starts muted; the
-  speaker button on it turns the sound on.
+- Every profile has five AI-generated photos (Valentina Vargas and Sofia
+  Santos have eleven, to show a longer history), newest post first. The
+  creators these briefs surface also have a short clip, which stands in the
+  place of the photo it was made from: a play mark shows on its frame, and it
+  plays muted while the mouse is on that frame. In quick look the speaker
+  button turns the sound on, and "Recent / Popular" reorders the posts.
 - Have `docs/EVAL.md` open in a second tab at "Results, final code".
 - Pressing Enter in the search box hands the keyboard to the grid, so the
   shortcuts in shot 4 work straight away.
@@ -50,8 +53,9 @@ across another.
 **4. Keyboard shortlist and copy (0:40 to 0:58)**
 
 Press Right, `S`. Arrow to the last card (Jade Santos) and pause on its
-warning. Press Space to open quick look (the clip plays muted, with the post
-and its top comments beside it), Esc to close. Click "Copy shortlist".
+warning. Press Space to open quick look (the post and its top comments sit
+beside the photo; pass the mouse along the thumbnails to reach the clip),
+Esc to close. Click "Copy shortlist".
 
 > "Arrow keys move, S shortlists. This last creator posts about energy drinks,
 > but the notes say they are exclusive with an energy drink brand until March,

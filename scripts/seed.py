@@ -309,8 +309,37 @@ def build(n: int, seed: int) -> list[dict]:
             "images": [],
         })
 
+    add_extra_posts(creators)
     add_reactions(creators)
     return creators
+
+
+# The two profiles the demo opens to show a longer history. Their extra posts are
+# appended after everything else is drawn, so no other creator changes.
+EXTRA_POSTS = {
+    "Sofia Santos": ("wellness", [
+        "Sunrise ocean swim, then coffee. The only alarm I don't snooze.",
+        "Sunday meal prep: five lunches, one tray, forty minutes.",
+        "Breathwork before a big meeting. Four counts in, six out.",
+        "New reformer studio opened down the road. First class verdict.",
+        "Balcony herb garden update: the basil survived.",
+        "Coastal walk with my sister, twelve kilometres and one very good pastry.",
+    ]),
+    "Valentina Vargas": ("food", [
+        "Sheet-pan chicken fajitas, 42 grams of protein a plate.",
+        "Farmers market run for the week. Peaches are finally in.",
+        "Cottage cheese pancakes. Stay with me on this one.",
+        "Hot chicken at home, baked not fried, still crunchy.",
+        "Sunday batch cook: turkey chili for the freezer.",
+        "Testing the air fryer salmon bites everyone keeps sending me.",
+    ]),
+}
+
+
+def add_extra_posts(creators: list[dict]) -> None:
+    for c in creators:
+        if c["name"] in EXTRA_POSTS:
+            c["captions"] += EXTRA_POSTS[c["name"]][1]
 
 
 # Top comments under each post, as a talent partner would see them on the
@@ -354,7 +383,12 @@ def add_reactions(creators: list[dict]) -> None:
     """Likes and three top comments per post. Uses its own random stream per
     creator, so adding this did not change any other generated field."""
     niche_of = {cap: niche for niche, caps in CAPTIONS.items() for cap in caps}
+    niche_of.update({cap: niche for niche, caps in EXTRA_POSTS.values() for cap in caps})
     for c in creators:
+        # How many days ago each post went up. Its own stream too, and drawn first so the
+        # order of a profile's posts has nothing to do with the order they were written in.
+        days = random.Random(f"posted-{c['id']}")
+        c["postDays"] = days.sample(range(1, 6 * len(c["captions"])), len(c["captions"]))
         rnd = random.Random(f"reactions-{c['id']}")
         c["reactions"] = []
         for cap in c["captions"]:

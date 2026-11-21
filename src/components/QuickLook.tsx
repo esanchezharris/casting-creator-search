@@ -1,43 +1,24 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Check, Heart, Play, Plus, Volume2, VolumeX, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, Heart, Play, Plus, X } from "lucide-react";
 import {
-  compact, Facts, FRAME_COUNT, Frames, initials, nichesOf, placeOf, StageBadge, Ticks, useScrub, Warning,
+  Clip, compact, Facts, FRAME_COUNT, Frames, initials, nichesOf, placeOf, StageBadge, Ticks, useScrub, Warning,
 } from "@/components/CreatorCard";
+import { Segmented } from "@/components/Segmented";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
+import { useElastic } from "@/lib/elastic";
 import { cn } from "@/lib/utils";
 import type { SearchResult } from "@/lib/types";
 
 const NOTE_LABEL = { reliability: "Reliability", terms: "Terms", conflict: "Conflict", status: "Status" };
 
-/**
- * The clip plays on a loop with the sound off, which is what browsers allow
- * without a click and what someone in an open office wants. The small glass
- * button turns the sound on.
- */
-function Clip({ src, poster }: { src: string; poster?: string }) {
-  const video = useRef<HTMLVideoElement>(null);
-  const [muted, setMuted] = useState(true);
-  useEffect(() => { if (video.current) video.current.muted = muted; }, [muted]);
-  return (
-    <>
-      <video
-        ref={video} src={src} poster={poster} autoPlay muted loop playsInline preload="metadata"
-        className="absolute inset-0 size-full object-cover"
-      />
-      <button
-        onClick={() => setMuted((m) => !m)}
-        aria-label={muted ? "Turn sound on" : "Turn sound off"}
-        aria-pressed={!muted}
-        className="press absolute right-3 bottom-3 grid size-9 place-items-center rounded-full bg-black/30 text-white backdrop-blur-md hover:bg-black/45"
-      >
-        {muted ? <VolumeX className="size-[18px]" /> : <Volume2 className="size-[18px]" />}
-      </button>
-    </>
-  );
-}
+type PostSort = "recent" | "popular";
+const POST_SORTS = [["recent", "Recent"], ["popular", "Popular"]] as const;
+
+const ago = (days: number) =>
+  days < 14 ? `${days} ${days === 1 ? "day" : "days"} ago` : `${Math.round(days / 7)} weeks ago`;
 
 type Props = {
   result: SearchResult;
@@ -50,30 +31,56 @@ type Props = {
 /**
  * Everything on file for one creator, laid out like a post on a profile: the
  * photo or clip on the left, and on the right the post it belongs to with its
- * top comments, then the numbers and CRM notes. The arrow keys still move
- * between creators while it is open (the page handles them), and the parent
- * keys this by creator id so it resets on each move.
+ * top comments, then the numbers and CRM notes. Posts run newest first, or
+ * most liked first; that order is separate from how the grid behind is sorted.
+ * The arrow keys still move between creators while it is open (the page
+ * handles them), and the parent keys this by creator id so it resets on each
+ * move.
  */
 export function QuickLook({ result, position, picked, onPick, onClose }: Props) {
   const { creator, reason, warning, matchedPost } = result;
   const count = creator.images.length || FRAME_COUNT;
-  const { index, setIndex, bind } = useScrub(count, true);
-  // A profile with a clip opens on it; touching a photo (or , and .) leaves it.
-  const [onClip, setOnClip] = useState(!!creator.video);
-  const seen = useRef(index);
-  useEffect(() => {
-    if (seen.current === index) return;
-    seen.current = index;
-    setOnClip(false);
-  }, [index]);
+  // Here the photo stays where it was left when the mouse moves off to read the post.
+  const { index, setIndex, bind: { onPointerLeave: _reset, ...bind } } = useScrub(count, true);
+  const [sort, setSort] = useState<PostSort>("recent");
 
-  // The post beside the photo: the caption that photo illustrates, or the first one when there are no photos.
-  const post = creator.photoPosts?.[onClip ? 0 : index] ?? Math.min(index, creator.captions.length - 1);
+  const postOf = (photo: number) => creator.photoPosts?.[photo] ?? Math.min(photo, creator.captions.length - 1);
+  const likes = (post: number) => creator.reactions?.[post]?.likes ?? 0;
+  const days = (post: number) => creator.postDays?.[post] ?? post;
+
+  // `images` is already newest first. Popular reorders the same photos by likes on their post.
+  const order = useMemo(() => {
+    const photos = Array.from({ length: count }, (_, i) => i);
+    if (sort === "popular") photos.sort((a, b) => likes(postOf(b)) - likes(postOf(a)));
+    return photos;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [creator, count, sort]);
+
+  const photo = order[index];
+  const post = postOf(photo);
   const reactions = creator.reactions?.[post];
-  const others = creator.captions.map((_, i) => i).filter((i) => i !== post);
+  const clipAt = creator.video && creator.videoAt != null ? order.indexOf(creator.videoAt) : -1;
+  const others = creator.captions.map((_, i) => i).filter((i) => i !== post)
+    .sort((a, b) => (sort === "popular" ? likes(b) - likes(a) : days(a) - days(b)));
 
-  const show = (i: number) => { seen.current = i; setIndex(i); setOnClip(false); };
-  const thumb = "press relative aspect-square min-w-0 flex-1 overflow-hidden rounded-lg bg-muted ring-offset-2 ring-offset-secondary aria-pressed:ring-2 aria-pressed:ring-foreground";
+  // The strip follows the photo on show, except when the mouse is what chose it.
+  const strip = useElastic<HTMLDivElement>("x");
+  const profile = useElastic<HTMLDivElement>("y");
+  const byThumb = useRef(false);
+  useEffect(() => {
+    const scroller = strip.current?.parentElement;
+    const thumb = strip.current?.querySelectorAll("button")[index];
+    if (!scroller || !thumb || byThumb.current) { byThumb.current = false; return; }
+    const left = thumb.offsetLeft - 8, right = thumb.offsetLeft + thumb.offsetWidth + 8;
+    if (left < scroller.scrollLeft) scroller.scrollLeft = left;
+    else if (right > scroller.scrollLeft + scroller.clientWidth) scroller.scrollLeft = right - scroller.clientWidth;
+  }, [index, strip]);
+
+  const show = (i: number, thumb = false) => { byThumb.current = thumb; setIndex(i); };
+  const resort = (next: PostSort) => {
+    setSort(next); setIndex(0);
+    if (profile.current?.parentElement) profile.current.parentElement.scrollTop = 0;
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/45 p-0 sm:p-6" onClick={onClose}>
@@ -85,37 +92,36 @@ export function QuickLook({ result, position, picked, onPick, onClose }: Props) 
       >
         {/* Media: the frame takes its width from the dialog's height, so the photo is never cropped or letterboxed. */}
         <div className="flex shrink-0 flex-col gap-2 bg-secondary p-3 md:h-full">
-          {onClip && creator.video ? (
-            <div className="frame w-full cursor-default! md:h-[calc(var(--h)-96px)] md:w-auto">
-              <Clip src={creator.video} poster={creator.images[0]} />
+          <div className="frame w-full md:h-[calc(var(--h)-132px)] md:w-auto" {...bind}>
+            <Frames creator={creator} index={index} loadAll order={order} />
+            {creator.video && <Clip src={creator.video} active={index === clipAt} sound />}
+            <Ticks count={count} index={index} show />
+          </div>
+
+          <div className="flex h-7 items-center justify-between gap-3 pl-1">
+            <span className="text-[13px] text-muted-foreground tabular-nums">{index + 1} of {count} posts</span>
+            {creator.images.length > 0 && <Segmented label="Order posts by" value={sort} options={POST_SORTS} onChange={resort} />}
+          </div>
+
+          {/* Passing the mouse over a thumbnail shows it, like sweeping across the photo itself. A long history scrolls sideways. */}
+          <div className="h-16 w-0 min-w-full overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
+            <div ref={strip} className="w-max">
+              <div className="flex gap-1.5 p-0.5">
+                {order.map((p, i) => (
+                  <button
+                    key={p} aria-pressed={i === index}
+                    aria-label={i === clipAt ? `Clip, post ${i + 1} of ${count}` : `Photo, post ${i + 1} of ${count}`}
+                    className="press relative size-[60px] shrink-0 overflow-hidden rounded-lg bg-muted ring-offset-2 ring-offset-secondary aria-pressed:ring-2 aria-pressed:ring-foreground"
+                    onClick={() => show(i, true)} onPointerEnter={(e) => { if (e.pointerType === "mouse") show(i, true); }}
+                  >
+                    {creator.images.length
+                      ? <img src={creator.images[p]} alt="" draggable={false} className="size-full object-cover" />
+                      : <span className="grid size-full place-items-center text-[13px] text-muted-foreground">{i + 1}</span>}
+                    {i === clipAt && <span className="absolute inset-0 grid place-items-center bg-black/25 text-white"><Play className="size-4 fill-current" /></span>}
+                  </button>
+                ))}
+              </div>
             </div>
-          ) : (
-            <div className="frame w-full md:h-[calc(var(--h)-96px)] md:w-auto" {...bind}>
-              <Frames creator={creator} index={index} loadAll />
-              <Ticks count={count} index={index} show />
-            </div>
-          )}
-          {/* Passing the mouse over a thumbnail shows it, like sweeping across the photo itself. */}
-          <div className="flex h-[64px] gap-1.5 p-0.5">
-            {creator.video && (
-              <button
-                className={thumb} aria-label="Play the clip" aria-pressed={onClip}
-                onClick={() => setOnClip(true)} onPointerEnter={(e) => { if (e.pointerType === "mouse") setOnClip(true); }}
-              >
-                {creator.images[0] && <img src={creator.images[0]} alt="" draggable={false} className="size-full object-cover" />}
-                <span className="absolute inset-0 grid place-items-center bg-black/25 text-white"><Play className="size-4 fill-current" /></span>
-              </button>
-            )}
-            {Array.from({ length: count }, (_, i) => (
-              <button
-                key={i} className={thumb} aria-label={`Photo ${i + 1} of ${count}`} aria-pressed={!onClip && i === index}
-                onClick={() => show(i)} onPointerEnter={(e) => { if (e.pointerType === "mouse") show(i); }}
-              >
-                {creator.images.length
-                  ? <img src={creator.images[i]} alt="" draggable={false} className="size-full object-cover" />
-                  : <span className="grid size-full place-items-center text-[13px] text-muted-foreground">{i + 1}</span>}
-              </button>
-            ))}
           </div>
         </div>
 
@@ -134,67 +140,82 @@ export function QuickLook({ result, position, picked, onPick, onClose }: Props) 
             <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close quick look" className="press -mr-2 size-8 text-muted-foreground"><X /></Button>
           </header>
 
-          <div className="min-h-0 flex-1 px-5 py-4 md:overflow-y-auto">
-            <p>
-              <span className="font-medium">{creator.handle.slice(1)}</span>{" "}{creator.captions[post]}
-            </p>
-            {post === matchedPost && <p className="mt-1 text-[13px] font-medium">Closest post to the brief</p>}
-            {reactions && (
-              <>
-                <p className="mt-2 flex items-center gap-1.5 text-[13px] text-muted-foreground">
-                  <Heart className="size-3.5" aria-hidden="true" />{compact(reactions.likes)} likes · top comments
+          <div className="min-h-0 flex-1 md:overflow-y-auto">
+            <div ref={profile}>
+              <div className="px-5 py-4">
+                <p>
+                  <span className="font-medium">{creator.handle.slice(1)}</span>{" "}{creator.captions[post]}
                 </p>
-                <ul className="mt-2 grid gap-1.5">
-                  {reactions.comments.map((c) => (
-                    <li key={c.user} className="text-[14px] leading-snug">
-                      <span className="font-medium">{c.user}</span>{" "}<span className="text-foreground/80">{c.text}</span>
+                {post === matchedPost && <p className="mt-1 text-[13px] font-medium">Closest post to the brief</p>}
+                {reactions && (
+                  <>
+                    <p className="mt-2 flex items-center gap-1.5 text-[13px] text-muted-foreground">
+                      <Heart className="size-3.5" aria-hidden="true" />{compact(reactions.likes)} likes
+                      {creator.postDays && ` · ${ago(days(post))}`}{index === clipAt && " · clip"}
+                    </p>
+                    <ul className="mt-2.5 grid gap-1.5">
+                      {reactions.comments.map((c) => (
+                        <li key={c.user} className="text-[14px] leading-snug">
+                          <span className="font-medium">{c.user}</span>{" "}<span className="text-foreground/80">{c.text}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+
+                <Facts creator={creator} className="mt-5 border-y py-4" />
+                <p className="mt-3 text-[13px] text-muted-foreground">
+                  {compact(creator.followers)} followers · largest audience market: {creator.audience.top}
+                  {" · "}
+                  {creator.partner
+                    ? `talent partner ${creator.partner}, ${creator.campaigns} ${creator.campaigns === 1 ? "campaign" : "campaigns"} completed`
+                    : "no talent partner yet"}
+                </p>
+
+                {warning && <Warning text={warning} className="mt-4" />}
+                {reason && (
+                  <p className="mt-4 text-[14px] leading-snug">
+                    <span className="block text-[13px] text-muted-foreground">Why this match</span>{reason}
+                  </p>
+                )}
+
+                <h3 className="mt-6 mb-1 text-[13px] text-muted-foreground">CRM notes</h3>
+                <ul>
+                  {creator.notes.map((n, i) => (
+                    <li key={i} className="grid grid-cols-[84px_1fr] gap-3 border-t py-2 text-[14px] first:border-t-0">
+                      <span className="text-[13px] leading-[1.7] text-muted-foreground">{NOTE_LABEL[n.kind]}</span>{n.text}
                     </li>
                   ))}
                 </ul>
-              </>
-            )}
 
-            <Facts creator={creator} className="mt-5 border-y py-4" />
-            <p className="mt-3 text-[13px] text-muted-foreground">
-              {compact(creator.followers)} followers · largest audience market: {creator.audience.top}
-              {" · "}
-              {creator.partner
-                ? `talent partner ${creator.partner}, ${creator.campaigns} ${creator.campaigns === 1 ? "campaign" : "campaigns"} completed`
-                : "no talent partner yet"}
-            </p>
-
-            {warning && <Warning text={warning} className="mt-4" />}
-            {reason && (
-              <p className="mt-4 text-[14px] leading-snug">
-                <span className="block text-[13px] text-muted-foreground">Why this match</span>{reason}
-              </p>
-            )}
-
-            <h3 className="mt-6 mb-1 text-[13px] text-muted-foreground">CRM notes</h3>
-            <ul>
-              {creator.notes.map((n, i) => (
-                <li key={i} className="grid grid-cols-[84px_1fr] gap-3 border-t py-2 text-[14px] first:border-t-0">
-                  <span className="text-[13px] leading-[1.7] text-muted-foreground">{NOTE_LABEL[n.kind]}</span>{n.text}
-                </li>
-              ))}
-            </ul>
-
-            <h3 className="mt-5 mb-2 text-[13px] text-muted-foreground">Other recent posts</h3>
-            <ol className="grid gap-1.5">
-              {others.map((i) => {
-                const photo = creator.photoPosts?.indexOf(i) ?? -1;
-                const row = cn("block w-full rounded-lg border px-3 py-2 text-left text-[14px]", i === matchedPost && "border-foreground");
-                const text = <>{i === matchedPost && <span className="mb-0.5 block text-[13px] font-medium">Closest to the brief</span>}{creator.captions[i]}</>;
-                // A post that has a photo jumps to it; one without is plain text.
-                return (
-                  <li key={i}>
-                    {photo >= 0
-                      ? <button className={cn(row, "press hover:border-foreground")} onClick={() => show(photo)}>{text}</button>
-                      : <p className={row}>{text}</p>}
-                  </li>
-                );
-              })}
-            </ol>
+                <h3 className="mt-5 mb-2 text-[13px] text-muted-foreground">
+                  Other posts, {sort === "popular" ? "most liked first" : "newest first"}
+                </h3>
+                <ol className="grid gap-1.5">
+                  {others.map((i) => {
+                    const at = order.indexOf(creator.photoPosts?.indexOf(i) ?? -1);
+                    const row = cn("block w-full rounded-lg border px-3 py-2 text-left text-[14px]", i === matchedPost && "border-foreground");
+                    const text = (
+                      <>
+                        <span className="mb-0.5 block text-[13px] text-muted-foreground tabular-nums">
+                          {i === matchedPost && <span className="font-medium text-foreground">Closest to the brief · </span>}
+                          {compact(likes(i))} likes{creator.postDays && ` · ${ago(days(i))}`}
+                        </span>
+                        {creator.captions[i]}
+                      </>
+                    );
+                    // A post that has a photo jumps to it; one without is plain text.
+                    return (
+                      <li key={i}>
+                        {at >= 0
+                          ? <button className={cn(row, "press hover:border-foreground")} onClick={() => show(at)}>{text}</button>
+                          : <p className={row}>{text}</p>}
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
+            </div>
           </div>
 
           <footer className="flex shrink-0 items-center gap-3 border-t px-5 py-3 max-sm:pb-20">

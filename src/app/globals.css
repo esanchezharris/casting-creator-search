@@ -63,7 +63,8 @@
 
 @layer base {
   * { @apply border-border outline-ring/50; }
-  html { @apply font-sans; }
+  /* The browser's own edge bounce is off; src/lib/elastic.ts does it the same way everywhere. */
+  html { @apply font-sans; overscroll-behavior: none; }
   body {
     @apply bg-background text-foreground antialiased;
     font-size: 15px;
@@ -84,6 +85,9 @@
   opacity: 0; pointer-events: none; -webkit-user-drag: none;
 }
 .frame img.on { opacity: 1; }
+/* A clip sits over the photo it was made from and shows only while it plays. */
+.frame video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; pointer-events: none; }
+.frame video.on { opacity: 1; }
 
 .ticks { position: absolute; left: 10px; right: 10px; bottom: 10px; display: flex; gap: 3px; pointer-events: none; opacity: 0; transition: opacity 150ms ease; }
 .ticks.show, [data-card]:focus-within .ticks { opacity: 1; }
@@ -111,7 +115,7 @@
 .press:active { transform: scale(0.97); }
 
 /* The shortlist bar is seen now and then, so it may arrive; it rises from where it sits. */
-.tray { transition: opacity 250ms var(--ease-out), transform 250ms var(--ease-out); }
+.tray { transition: opacity 250ms var(--ease-out), transform 250ms var(--ease-out), left 200ms var(--ease-out); }
 @starting-style { .tray { opacity: 0; transform: translate(-50%, 12px); } }
 
 @media (prefers-reduced-motion: reduce) {

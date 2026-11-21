@@ -207,3 +207,19 @@ creators, which is the run-to-run variation noted above, not the new rule.
 The new cases were written alongside the rule, so they belong to the tuned
 set and say nothing about briefs phrased differently ("female-identifying",
 "dudes", "moms").
+
+## Addendum: twelve more posts (20 Nov 2026, last)
+
+Two roster creators (Sofia Santos, Valentina Vargas) were given six more posts
+each, 979 embedded texts in all, and `data/embeddings.json` was rebuilt. Same
+60 briefs, rerun in two modes:
+
+| Mode | Tuned filters | Tuned P@5 | Tuned recall | Tuned nobody-fits | Held-out filters | Held-out P@5 | Held-out recall | Held-out nobody-fits |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Rules + keywords | 50/50 | 0.89 | 0.77 | 4/4 | 7/10 | 0.80 | 0.80 | 1/1 |
+| LLM + embeddings | 49/50 | 0.85 | 0.75 | 2/4 | 6/10 | 0.63 | 1.00 | 1/1 |
+
+Rules + keywords is unchanged. LLM + embeddings kept its ranking scores and
+lost one tuned filter case on this run. Expected-result lists were not
+edited for the new posts. LLM + keywords and rules + embeddings were not
+rerun.

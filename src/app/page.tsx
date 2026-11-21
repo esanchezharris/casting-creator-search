@@ -7,12 +7,13 @@ import { CreatorCard, compact, initials, money } from "@/components/CreatorCard"
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { FilterChips, summarize, type FilterEdit } from "@/components/FilterChips";
 import { activeCount, FilterPanel, SORTS, type Sort } from "@/components/FilterPanel";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { QuickLook } from "@/components/QuickLook";
+import { Segmented } from "@/components/Segmented";
+import { useElastic } from "@/lib/elastic";
 import type { Creator, SearchResponse, SearchResult } from "@/lib/types";
 
 const NO_FILTERS = { niches: [], locations: [], stages: [], genders: [], minFollowers: null, maxFollowers: null, minEngagement: null, minAudienceUS: null, semantic: "" };
@@ -73,10 +74,17 @@ export default function Page() {
     try { saved = localStorage.getItem(PANEL); } catch { /* use the default */ }
     setPanel(saved != null ? saved === "open" : window.matchMedia("(min-width: 1024px)").matches);
   }, []);
-  const togglePanel = () => setPanel((open) => {
-    try { localStorage.setItem(PANEL, open ? "closed" : "open"); } catch { /* not remembered */ }
-    return !open;
-  });
+  // The panel slides only when someone presses the button, not when the saved state is restored.
+  const [slide, setSlide] = useState(false);
+  const togglePanel = () => {
+    setSlide(true);
+    setPanel((open) => {
+      try { localStorage.setItem(PANEL, open ? "closed" : "open"); } catch { /* not remembered */ }
+      return !open;
+    });
+  };
+  const filterList = useElastic<HTMLDivElement>();
+  const pageBody = useElastic<HTMLDivElement>("y", true);
 
   const input = useRef<HTMLInputElement>(null);
   const cards = useRef<(HTMLElement | null)[]>([]);
@@ -209,9 +217,16 @@ export default function Page() {
   return (
     <div className="lg:flex">
       {panel && <div className="fixed inset-0 z-30 bg-foreground/30 lg:hidden" onClick={togglePanel} aria-hidden="true" />}
-      {panel && (
-        <aside aria-label="Filters" className="fixed inset-y-0 left-0 z-40 w-[280px] shrink-0 border-r bg-secondary lg:sticky lg:top-0 lg:z-auto lg:h-screen lg:w-[264px]">
-          <div className="flex h-full flex-col">
+      {/* On a wide screen the panel's width closes to nothing and its contents, pinned to the right edge, slide out with it. */}
+      <aside
+        aria-label="Filters" inert={!panel}
+        className={cn(
+          "shrink-0 bg-secondary max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-40 max-lg:w-[280px] max-lg:border-r lg:sticky lg:top-0 lg:h-screen lg:overflow-hidden",
+          slide && "lg:transition-[width] lg:duration-200 lg:ease-(--ease-out) motion-reduce:transition-none",
+          panel ? "lg:w-[264px]" : "max-lg:hidden lg:w-0",
+        )}
+      >
+          <div className="flex h-full flex-col lg:absolute lg:inset-y-0 lg:right-0 lg:w-[264px] lg:border-r">
             <div className="flex h-12 shrink-0 items-center justify-between border-b pr-2 pl-4">
               <h2 className="text-[14px] font-medium">
                 Filters{active > 0 && <span className="ml-1.5 font-normal text-muted-foreground tabular-nums">{active}</span>}
@@ -227,13 +242,14 @@ export default function Page() {
                 </Button>
               </div>
             </div>
-            {/* overscroll-contain: reaching the end of this list must not start scrolling the results. */}
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-              <FilterPanel parsed={parsed} places={data?.places ?? []} facets={data?.facets ?? {}} onChange={(filters) => run({ filters })} />
+            {/* Reaching the end of this list gives a little and settles; it never starts scrolling the results. */}
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <div ref={filterList}>
+                <FilterPanel parsed={parsed} places={data?.places ?? []} facets={data?.facets ?? {}} onChange={(filters) => run({ filters })} />
+              </div>
             </div>
           </div>
-        </aside>
-      )}
+      </aside>
 
       <main className="min-w-0 flex-1 px-4 pb-28 sm:px-5">
         <div className="sticky top-0 z-20 -mx-4 border-b bg-background/90 px-4 backdrop-blur-md sm:-mx-5 sm:px-5">
@@ -273,6 +289,7 @@ export default function Page() {
           </form>
         </div>
 
+        <div ref={pageBody}><div>
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-3 pb-1">
           <div className="flex min-h-7 min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5" aria-live="polite">
             <h1 className="text-[15px] font-medium whitespace-nowrap">
@@ -291,20 +308,7 @@ export default function Page() {
               </span>
             )}
             <div className="-mx-1 max-w-full overflow-x-auto px-1 [scrollbar-width:none]">
-              <ToggleGroup
-                aria-label="Sort by" value={[sort]} spacing={0}
-                onValueChange={(v) => { if (v[0]) setSort(v[0] as Sort); }}
-                className="rounded-lg border bg-card p-0.5"
-              >
-                {SORTS.map(([key, label]) => (
-                  <ToggleGroupItem
-                    key={key} value={key}
-                    className="h-6 rounded-md! px-2.5 text-[13px] font-normal text-muted-foreground hover:bg-transparent hover:text-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground"
-                  >
-                    {label}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
+              <Segmented label="Sort by" value={sort} options={SORTS} onChange={setSort} />
             </div>
           </div>
         </div>
@@ -358,6 +362,7 @@ export default function Page() {
             {all.some((r) => r.creator.images.length > 0) && " The photos and clips are AI-generated; nobody in them is a real person."}
           </p>
         </footer>
+        </div></div>
       </main>
 
       {open && (

@@ -38,6 +38,10 @@ export type Creator = {
   photoPosts?: number[];
   /** A short clip shown in quick look. Photos and clips are AI-generated stand-ins (scripts/apply_media.py). */
   video?: string;
+  /** Which photo the clip was made from. The clip is shown in that photo's place, never beside it. */
+  videoAt?: number;
+  /** For each caption, how many days ago it was posted. `images` is ordered newest post first. */
+  postDays?: number[];
 };
 
 export type Gender = "woman" | "man";

@@ -37,6 +37,7 @@ ran, next to the result count.
   screen, to flip through a profile without opening it.
 - **Quick look.** Space, or a click on the photo or name, opens the profile
   like a post: photo (or a short muted clip with a sound button) on the left,
+  posts ordered newest first or most liked first,
   and beside it the post that photo belongs to with its likes and top
   comments, then the numbers, CRM notes and other posts. Passing the mouse
   over the thumbnails flips through them. The arrow keys keep moving between
@@ -101,7 +102,9 @@ Nov 2026.
 
 Every photo and clip was generated on Higgsfield for this demo and saved in
 `public/creators/<id>/` (`1.jpg` to `5.jpg`, and `clip.mp4` for the creators
-the demo briefs surface).
+the demo briefs surface). Two profiles carry six more posts and photos
+(`6.jpg` to `11.jpg`). Photos are listed newest post first, and a clip takes
+the place of the photo it was animated from.
 
     python3 scripts/media_prompts.py    # writes data/media_prompts.json: the prompts for every creator
     python3 scripts/apply_media.py      # points data/creators.json at the files; run after `npm run seed`

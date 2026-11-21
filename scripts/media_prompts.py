@@ -244,7 +244,9 @@ def build(c: dict) -> dict:
     person = (f"a {who['age']}-year-old {who['heritage']} {noun}, {who['hair']}, {who['feature']}, {who['build']}")
 
     # Illustrate five of the six posts. For men, pass over the posts whose scene would not fit, when there is a choice.
-    order = list(range(len(c["captions"])))
+    # Only the six seeded posts. The extra posts two profiles carry (EXTRA_POSTS in seed.py)
+    # were prompted by hand with the same wording, as photos 6 to 11.
+    order = list(range(min(6, len(c["captions"]))))
     rng.shuffle(order)
     if who["man"]:
         order.sort(key=lambda i: any(k in c["captions"][i].lower() for k in MALE_SKIP))
@@ -274,7 +276,7 @@ def build(c: dict) -> dict:
 
 def main() -> None:
     creators = json.loads(DATA.read_text())
-    missing = sorted({cap for c in creators for cap in c["captions"]} - set(SCENES))
+    missing = sorted({cap for c in creators for cap in c["captions"][:6]} - set(SCENES))
     if missing:
         sys.exit("No scene written for: " + "; ".join(missing))
     plans = [build(c) for c in creators]

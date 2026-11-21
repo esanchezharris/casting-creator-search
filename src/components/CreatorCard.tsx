@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useRef, useState } from "react";
-import { Check, Plus, TriangleAlert } from "lucide-react";
+import { Check, Play, Plus, TriangleAlert, Volume2, VolumeX } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Kbd } from "@/components/ui/kbd";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -64,7 +64,7 @@ export function useScrub(n: number, keys: boolean) {
  * placeholders (initials and a frame number on a neutral tint) so the scrub
  * still reads clearly.
  */
-export function Frames({ creator, index, loadAll }: { creator: Creator; index: number; loadAll: boolean }) {
+export function Frames({ creator, index, loadAll, order }: { creator: Creator; index: number; loadAll: boolean; order?: number[] }) {
   if (!creator.images.length) {
     return (
       <>
@@ -79,16 +79,53 @@ export function Frames({ creator, index, loadAll }: { creator: Creator; index: n
   }
   return (
     <>
-      {creator.images.map((src, i) =>
+      {(order ?? creator.images.map((_, i) => i)).map((photo, i) =>
         i === 0 || loadAll ? (
           <img
-            key={src} src={src} alt={i === 0 ? creator.name : ""}
+            key={creator.images[photo]} src={creator.images[photo]} alt={i === 0 ? creator.name : ""}
             className={i === index ? "on" : ""} loading={i === 0 ? "lazy" : "eager"} draggable={false}
           />
         ) : null,
       )}
     </>
   );
+}
+
+/**
+ * A creator's clip, drawn over the photo it was made from. It plays, with the
+ * sound off, only while its frame is the one showing, and rewinds when it is
+ * not. `sound` adds the small glass button that turns the sound on.
+ */
+export function Clip({ src, active, sound }: { src: string; active: boolean; sound?: boolean }) {
+  const video = useRef<HTMLVideoElement>(null);
+  const [muted, setMuted] = useState(true);
+  useEffect(() => {
+    const v = video.current;
+    if (!v) return;
+    if (active) v.play().catch(() => { /* the photo stays up */ });
+    else { v.pause(); if (v.currentTime) v.currentTime = 0; }
+  }, [active]);
+  useEffect(() => { if (video.current) video.current.muted = muted; }, [muted]);
+  return (
+    <>
+      <video ref={video} src={src} muted loop playsInline preload={active ? "auto" : "none"} className={active ? "on" : ""} />
+      {sound && active && (
+        <button
+          onClick={(e) => { e.stopPropagation(); setMuted((m) => !m); }}
+          aria-label={muted ? "Turn sound on" : "Turn sound off"}
+          aria-pressed={!muted}
+          className="press absolute right-3 bottom-5 grid size-9 cursor-pointer place-items-center rounded-full bg-black/30 text-white backdrop-blur-md hover:bg-black/45"
+        >
+          {muted ? <VolumeX className="size-[18px]" /> : <Volume2 className="size-[18px]" />}
+        </button>
+      )}
+    </>
+  );
+}
+
+/** Marks a frame as a clip while it is showing its still. */
+export function ClipMark() {
+  return <Play className="pointer-events-none absolute top-3 left-3 size-4 fill-white text-white drop-shadow-[0_1px_2px_rgb(0_0_0/0.5)]" aria-hidden="true" />;
 }
 
 export function Ticks({ count, index, show }: { count: number; index: number; show?: boolean }) {
@@ -191,6 +228,9 @@ export const CreatorCard = forwardRef<HTMLElement, Props>(function CreatorCard(
           onClick={(e) => { if (Math.abs(e.clientX - downX.current) < 8) onOpen(); }}
         >
           <Frames creator={creator} index={index} loadAll={near} />
+          {/* The clip plays while the mouse or the arrow keys are on its frame. */}
+          {creator.video && near && <Clip src={creator.video} active={focused && index === creator.videoAt} />}
+          {creator.video && index === creator.videoAt && !focused && <ClipMark />}
           <Ticks count={count} index={index} show={focused} />
         </div>
         <Tooltip>

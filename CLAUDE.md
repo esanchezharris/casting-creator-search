@@ -99,8 +99,22 @@ UI: rebuilt on Tailwind 4 and shadcn (Base UI flavour) on 20 Nov. Components
 are in `src/components/ui`. Emil Kowalski's skills are installed in
 `.agents/skills` (read `emil-design-eng` before touching motion).
 
-Checked in a browser at 1440px and 390px. Not checked: touch drag on a real
-touch screen.
+Posts and media order (20 Nov, late): each caption has `postDays` (seed
+script) and `images` is ordered newest post first by `apply_media.py`. A clip
+replaces the photo it was made from (`videoAt`), in the card and in quick
+look, and plays muted only while its frame is showing. Quick look has its own
+Recent / Popular order. Sofia Santos (c004) and Valentina Vargas (c116) have
+six extra posts and photos (`EXTRA_POSTS` in `scripts/seed.py`, photos 6 to
+11 prompted by hand). After a reseed run `apply_media.py` and `npm run embed`.
+
+Scrolling: `src/lib/elastic.ts` gives the filter list, the page, the quick
+look column and the thumbnail strip the same small pull-and-settle at their
+ends (wheel and trackpad; the browser's own bounce is turned off). The
+filter panel slides by animating its width for 200ms.
+
+Checked in a browser at 1440px. Phone layout is out of scope: this is for a
+laptop demo. Not checked: how the elastic scroll feels on a real trackpad
+(tested with synthetic wheel events).
 
 Not built: a hybrid ranker (keywords to decide if anyone fits, embeddings to
 reorder), which docs/EVAL.md argues is the next step.
