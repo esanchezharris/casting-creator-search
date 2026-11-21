@@ -181,7 +181,7 @@ async function rankByEmbeddings(pool: Creator[], semantic: string): Promise<Sear
 /** Below this many roster matches, applicants and prospects who fit are returned as a second group. */
 export const ROSTER_MIN = 5;
 
-type Ranker = "embeddings" | "keywords" | "hybrid" | "reach";
+type Ranker = "embeddings" | "keywords" | "hybrid" | "judge" | "smart" | "reach";
 
 /**
  * Keyword matches scoring below this share of the best match are dropped. Without it, a creator
@@ -220,7 +220,76 @@ async function rankHybrid(pool: Creator[], semantic: string): Promise<SearchResu
   return kw.map((r) => ({ ...r, score: emb.get(r.creator.id) ?? 0 }));
 }
 
-export type Forced = "keywords" | "embeddings" | "hybrid";
+// ------------------------------------------------------------ LLM judge
+
+/** Every distinct post and searchable note in the database. The judge reads these, not creators. */
+const TEXTS = [...new Set(creators.flatMap((c) => [...c.captions, ...searchableNotes(c).map((n) => n.text)]))].sort();
+
+const JUDGE_SYSTEM = `You match a topic from a brand's casting brief against creators' posts and CRM notes.
+You get the topic and a numbered list of texts. Return the numbers of every text that is about the topic: a person reading the text would agree it shows the creator posts about, or does, what the topic asks for, even when the words differ ("rest" and "sleep").
+A text that only shares a word with the topic, or is only in the same broad category, does not match.
+If no text matches, return an empty list. Reply with JSON only: {"match":[numbers]}`;
+
+const judged = new Map<string, Set<string>>();
+
+/** Which posts and notes are about the topic, decided by the model. One call per new topic. */
+async function judgeTopic(semantic: string): Promise<Set<string>> {
+  const key = semantic.trim().toLowerCase();
+  const hit = judged.get(key);
+  if (hit) return hit;
+  const model = process.env.JUDGE_MODEL ?? "gpt-4o-mini";
+  const base = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1";
+  const res = await fetch(`${base}/chat/completions`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+    body: JSON.stringify({
+      model,
+      response_format: { type: "json_object" },
+      ...(model.startsWith("gpt-4") ? { temperature: 0 } : { reasoning_effort: "low" }),
+      messages: [
+        { role: "system", content: JUDGE_SYSTEM },
+        { role: "user", content: `Topic: ${semantic}\n\nTexts:\n${TEXTS.map((t, i) => `${i}. ${t}`).join("\n")}` },
+      ],
+    }),
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) throw new Error(`judge HTTP ${res.status}`);
+  const raw = JSON.parse((await res.json()).choices[0].message.content);
+  // Only numbers that point at a real text survive; anything else the model wrote is ignored.
+  const out = new Set<string>((Array.isArray(raw.match) ? raw.match : []).filter((i: unknown) => Number.isInteger(i) && TEXTS[i as number]).map((i: number) => TEXTS[i]));
+  judged.set(key, out);
+  return out;
+}
+
+async function rankByJudge(pool: Creator[], semantic: string): Promise<SearchResult[]> {
+  const match = await judgeTopic(semantic);
+  return pool.flatMap((creator) => {
+    const posts = creator.captions.map((cap, i) => ({ i, cap })).filter((p) => match.has(p.cap));
+    const notes = searchableNotes(creator).filter((n) => match.has(n.text));
+    if (!posts.length && !notes.length) return [];
+    const reason = posts.length ? `${posts.length} of ${creator.captions.length} recent posts match: “${clip(posts[0].cap)}”` : `CRM note: “${clip(notes[0].text)}”`;
+    return [{ creator, score: posts.length + 0.5 * notes.length, reason, matchedPost: posts.length ? posts[0].i : null, warning: null }];
+  });
+}
+
+/**
+ * Keywords first, the judge when keywords cannot cover the topic.
+ *   Some creator has every word of the topic: the brief uses words creators use, and the keyword
+ *   matches are the answer. No model call.
+ *   Otherwise the brief is a paraphrase, or about something nobody posts: the model reads the
+ *   distinct posts and notes and says which are about the topic. It can say none.
+ */
+async function rankSmart(pool: Creator[], semantic: string): Promise<SearchResult[]> {
+  const kw = keywordMatches(pool, semantic);
+  const q = queryTokens(semantic);
+  const literal = kw.some((r) => { const toks = docTokens.get(r.creator.id)!; return q.every((t) => toks.includes(t)); });
+  if (!literal) return rankByJudge(pool, semantic);
+  if (process.env.SMART_ORDER !== "embeddings" || !loadEmbeddings()) return kw;
+  const emb = new Map((await embedScores(pool, semantic)).map((r) => [r.creator.id, r.score]));
+  return kw.map((r) => ({ ...r, score: emb.get(r.creator.id) ?? 0 }));
+}
+
+export type Forced = "keywords" | "embeddings" | "hybrid" | "judge" | "smart";
 
 async function rank(pool: Creator[], semantic: string, forced?: Forced): Promise<{ ranked: SearchResult[]; ranker: Ranker }> {
   if (!semantic.trim()) {
@@ -233,10 +302,13 @@ async function rank(pool: Creator[], semantic: string, forced?: Forced): Promise
   const want = forced ?? (process.env.RANKER as Forced | undefined) ?? "hybrid";
   let ranked: SearchResult[] | null = null;
   let ranker: Ranker = "keywords";
-  if (embeddingsReady() && want !== "keywords") {
+  if (process.env.OPENAI_API_KEY && want !== "keywords" && (embeddingsReady() || want === "judge" || want === "smart")) {
     try {
-      ranked = want === "hybrid" ? await rankHybrid(pool, semantic) : await rankByEmbeddings(pool, semantic);
-      ranker = want === "hybrid" ? "hybrid" : "embeddings";
+      ranked = want === "hybrid" ? await rankHybrid(pool, semantic)
+        : want === "judge" ? await rankByJudge(pool, semantic)
+        : want === "smart" ? await rankSmart(pool, semantic)
+        : await rankByEmbeddings(pool, semantic);
+      ranker = want;
     } catch (e) {
       console.warn("embedding ranker failed, using keywords:", e);
     }

@@ -324,6 +324,9 @@ Examples:
 "a snack for after the gym" -> {"niches":[],"locations":[],"stages":[],"genders":[],"minAge":null,"maxAge":null,"minFollowers":null,"maxFollowers":null,"maxRate":null,"minEngagement":null,"minAudienceUS":null,"semantic":"a snack for after the gym"}`;
 
 export const llmConfigured = () => !!process.env.OPENAI_API_KEY;
+export const LLM_MODEL = () => process.env.LLM_MODEL ?? "gpt-4o-mini";
+/** The gpt-4 family takes a temperature; later models take a reasoning effort instead. */
+export const modelOptions = (model: string) => (model.startsWith("gpt-4") ? { temperature: 0 } : { reasoning_effort: "low" });
 
 /** Clamp whatever came back (LLM output or client chips) to the schema. */
 export function sanitize(raw: unknown): ParsedQuery {
@@ -370,9 +373,9 @@ export async function parseWithLLM(query: string): Promise<ParsedQuery> {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
     body: JSON.stringify({
-      model: process.env.LLM_MODEL ?? "gpt-4o-mini",
+      model: LLM_MODEL(),
       response_format: { type: "json_object" },
-      temperature: 0,
+      ...modelOptions(LLM_MODEL()),
       messages: [{ role: "system", content: SYSTEM }, { role: "user", content: query }],
     }),
     signal: AbortSignal.timeout(8000),

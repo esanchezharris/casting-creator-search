@@ -24,7 +24,7 @@ const KEYS: [string[], string][] = [
 ];
 
 const PARSER_LABEL = { llm: "Read by the language model", rules: "Read by the rule parser", chips: "Filters edited by hand" };
-const RANKER_LABEL = { embeddings: "ranked by meaning", keywords: "ranked by keywords", hybrid: "ranked by keywords and meaning", reach: "ordered by recent reach" };
+const RANKER_LABEL = { embeddings: "ranked by meaning", keywords: "ranked by keywords", hybrid: "ranked by keywords and meaning", judge: "matched by the language model", smart: "matched by keywords, then the language model", reach: "ordered by recent reach" };
 
 const STORE = "casting.shortlist.v1";
 type Shortlist = { brief: string; creators: Creator[] };

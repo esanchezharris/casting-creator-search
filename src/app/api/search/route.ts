@@ -5,7 +5,7 @@ import type { SearchResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-const FORCED = ["keywords", "embeddings", "hybrid"];
+const FORCED = ["keywords", "embeddings", "hybrid", "judge", "smart"];
 
 /**
  * POST { query: string }      parse natural language, then search

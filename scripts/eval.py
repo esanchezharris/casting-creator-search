@@ -140,7 +140,7 @@ def main() -> None:
     ap.add_argument("--url", default="http://localhost:3000")
     ap.add_argument("--quiet", action="store_true", help="only print the summary")
     ap.add_argument("--parser", choices=["rules"], help="force the rule parser")
-    ap.add_argument("--ranker", choices=["keywords", "embeddings", "hybrid"], help="force a ranker")
+    ap.add_argument("--ranker", choices=["keywords", "embeddings", "hybrid", "judge", "smart"], help="force a ranker")
     args = ap.parse_args()
     FORCE.update({k: v for k, v in (("parser", args.parser), ("ranker", args.ranker)) if v})
 
