@@ -267,3 +267,22 @@ on this run with running as a second creator type. The cutoffs were not
 retuned for the larger data. LLM + keywords and rules + embeddings were not
 rerun. The three briefs in docs/DEMO.md return the same counts as before
 (9; 1 on the roster and 4 not yet; 7).
+
+## Addendum: 178 creators (20 Nov 2026, late night)
+
+Eight more roster creators were added (high-reach beauty and fashion), 178 in
+all: 115 roster, 40 applicants, 23 prospects. Embeddings were rebuilt. With no
+topic in the brief the app now lists every stage together; a brief with a
+topic still lists the roster first, which is what the eval measures. Same 65
+briefs.
+
+| Mode | Tuned filters | Tuned P@5 | Tuned recall | Tuned nobody-fits | Held-out filters | Held-out P@5 | Held-out recall | Held-out nobody-fits |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Rules + keywords | 55/55 | 0.86 | 0.74 | 4/4 | 7/10 | 0.86 | 0.86 | 1/1 |
+| LLM + embeddings | 55/55 | 0.88 | 0.75 | 1/4 | 7/10 | 0.70 | 1.00 | 1/1 |
+
+On precision the two are level. They differ when nobody fits: for "creators
+who post about cryptocurrency trading" rules + keywords returned nobody and
+LLM + embeddings returned 21 people. The held-out set is 10 briefs, 5 of them
+with a topic, so its figures move a lot on one brief. LLM + keywords and
+rules + embeddings were not rerun on this data.

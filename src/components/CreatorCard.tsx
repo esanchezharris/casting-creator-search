@@ -196,19 +196,21 @@ export const CreatorCard = forwardRef<HTMLElement, Props>(function CreatorCard(
   const { index, bind } = useScrub(count, focused);
   useEffect(() => { onFrame(index); }, [index]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Only the first photo loads up front. The rest load once the card is within
-  // about a row of the viewport, so the first sweep never lands on a blank frame.
+  // Only the cover loads up front. The other frames load a moment after the card is on screen,
+  // so a page of covers is never queued behind several hundred photos nobody has swept yet.
   const [near, setNear] = useState(false);
   const el = useRef<HTMLElement | null>(null);
   const downX = useRef(0);
   useEffect(() => {
     if (!el.current || near || !("IntersectionObserver" in window)) return;
-    const io = new IntersectionObserver(
-      (entries) => { if (entries.some((x) => x.isIntersecting)) { setNear(true); io.disconnect(); } },
-      { rootMargin: "600px 0px" },
-    );
+    let timer = 0;
+    const io = new IntersectionObserver((entries) => {
+      const seen = entries.some((x) => x.isIntersecting);
+      window.clearTimeout(timer);
+      if (seen) timer = window.setTimeout(() => { setNear(true); io.disconnect(); }, 1200);
+    });
     io.observe(el.current);
-    return () => io.disconnect();
+    return () => { io.disconnect(); window.clearTimeout(timer); };
   }, [near]);
 
   return (

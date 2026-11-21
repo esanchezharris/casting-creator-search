@@ -40,7 +40,7 @@ three stages. It does not crawl social platforms for strangers.
 ## Commands
     npm run dev      # http://localhost:3000
     npm run build    # must pass before you call anything done
-    npm run seed     # regenerate data/creators.json (170 fictional creators, seed 11)
+    npm run seed     # regenerate data/creators.json (178 fictional creators, seed 11)
     npm run embed    # needs OPENAI_API_KEY; writes data/embeddings.json (rerun after a reseed)
     npm run eval     # needs the app running; prints parser + P@5 scores
 
@@ -121,6 +121,14 @@ data is now 170: 107 roster, 40 applicants, 23 prospects; 131 women; 101
 with a beauty, skincare, hair or fashion first niche, beauty the largest.
 Five clips (c043, c076, c100, c102, c119) were remade from their clean first
 photo.
+
+Headliners (20 Nov, late night): eight more roster women (c171 to c178,
+`headliners()` in `seed.py`), 350K to 900K followers, glam captions only,
+and a more polished prompt style in `media_prompts.py`. Emilio found the
+earlier sets too average-looking. Total is 178 (115 roster).
+
+Default view: with no topic the search returns every stage in one list by
+recent reach. Roster-first grouping applies only when the brief has a topic.
 
 Age (20 Nov, last): each creator has `age`, drawn in `seed.py` from the same
 stream `media_prompts.py` uses, so it matches the photos. Age in a brief is

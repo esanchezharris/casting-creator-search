@@ -188,10 +188,10 @@ const KEYWORD_CUTOFF = Number(process.env.KEYWORD_CUTOFF ?? 0.5);
 
 async function rank(pool: Creator[], semantic: string): Promise<{ ranked: SearchResult[]; ranker: Ranker }> {
   if (!semantic.trim()) {
-    // No topic: best photo sets first (this is the first screen of the demo), then recent reach.
+    // No topic: highest recent reach first.
     const ranked = pool
       .map((creator) => ({ creator, score: 0, reason: null, matchedPost: null, warning: null }))
-      .sort((a, b) => b.creator.images.length - a.creator.images.length || b.creator.recentReach - a.creator.recentReach);
+      .sort((a, b) => b.creator.recentReach - a.creator.recentReach);
     return { ranked, ranker: "reach" };
   }
   let ranked: SearchResult[] | null = null;
@@ -227,7 +227,10 @@ export async function search(q: ParsedQuery): Promise<{ results: SearchResult[];
   }
   const { ranked, ranker } = await rank(applyFilters(q), q.semantic);
 
-  // Roster first. Only when the roster is thin do we show who would be worth signing.
+  // Browsing (no topic to match): everyone in one list, whatever their stage.
+  if (!q.semantic.trim()) return { results: ranked, offRoster: [], ranker };
+
+  // A brief with a topic: roster first. Only when the roster is thin do we show who would be worth signing.
   const results = ranked.filter((r) => r.creator.stage === "roster");
   const offRoster = results.length < ROSTER_MIN ? ranked.filter((r) => r.creator.stage !== "roster") : [];
   return { results, offRoster, ranker };

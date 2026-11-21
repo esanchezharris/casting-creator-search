@@ -149,7 +149,7 @@ export function FilterPanel({ parsed: q, places, facets, onChange }: Props) {
         {STAGES.map((s) => (
           <Option key={s} label={STAGE_NAME[s]} count={facets[`stage:${s}`]} checked={q.stages.includes(s)} onToggle={() => onChange({ ...q, stages: toggle(q.stages, s) })} />
         ))}
-        <p className="mt-1.5 text-[13px] leading-snug text-muted-foreground">With none ticked, the roster is searched first.</p>
+        <p className="mt-1.5 text-[13px] leading-snug text-muted-foreground">With none ticked, everyone is shown. A brief with a topic lists the roster first.</p>
       </Section>
 
       <Section title="Creator type">

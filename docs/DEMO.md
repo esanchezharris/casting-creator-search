@@ -20,7 +20,11 @@ The LLM is not perfectly repeatable, so run each brief once before recording.
   place of the photo it was made from: a play mark shows on its frame, and it
   plays muted while the mouse is on that frame. In quick look the speaker
   button turns the sound on, and "Recent / Popular" reorders the posts.
-- Have `docs/EVAL.md` open in a second tab at "Results, final code".
+- Have `docs/EVAL.md` open in a second tab at its last section, "178 creators".
+- With nothing typed the page lists all 178 creators, every stage together,
+  highest recent reach first. A brief with a topic lists the roster first.
+- A search takes one to two seconds (a language-model call and an embedding
+  call). Wait for "Searching…" to clear before pressing keys.
 - Pressing Enter in the search box hands the keyboard to the grid, so the
   shortcuts in shot 4 work straight away.
 
@@ -82,13 +86,14 @@ the first five quote "Sleep routine: magnesium, no phone, lights out by ten."
 
 **7. The eval table (1:30 to 1:52)**
 
-Switch to `docs/EVAL.md`. Point at the results table, then at the row for
-"cryptocurrency trading" in the second table.
+Switch to `docs/EVAL.md`, last section ("178 creators"). Point at the two
+rows of the table, then at the sentence about cryptocurrency under it.
 
-> "I measured all of it on fifty-six test briefs, in four configurations. The
-> honest result: plain rules and keywords are the most precise, 0.88 against
-> 0.83. Embeddings win on paraphrase and fail somewhere else: ask about
-> cryptocurrency, where nobody fits, and they still return eight people."
+> "I measured all of it on sixty-five test briefs, in two configurations. On
+> precision they are level: 0.86 for plain rules and keywords, 0.88 for the
+> language model with embeddings. The difference is what happens when nobody
+> fits. Ask about cryptocurrency and keywords return nobody; embeddings still
+> return twenty-one people."
 
 **8. Close (1:52 to 2:00)**
 
@@ -105,6 +110,6 @@ Back to the app.
 | Shot 4 | conflict on the last card | app, brief 1, ninth result (Jade Santos) |
 | Shot 5 | 1 on the roster, 4 not yet | app, brief 2, LLM + embeddings |
 | Shot 6 | 7 returned, 5 about sleep | app; `docs/eval-runs/llm-embeddings.txt` (5 expected, 7 returned, P@5 1.00) |
-| Shot 7 | 56 briefs, four configurations | `docs/EVAL.md`, results table |
-| Shot 7 | P@5 0.88 against 0.83 | `docs/EVAL.md`, tuned set: rules + keywords vs LLM + embeddings |
-| Shot 7 | cryptocurrency returns 8 | `docs/EVAL.md`, second table |
+| Shot 7 | 65 briefs, two configurations | `docs/EVAL.md`, last section (178 creators) |
+| Shot 7 | P@5 0.86 and 0.88 | `docs/EVAL.md`, last section, tuned set: rules + keywords, LLM + embeddings |
+| Shot 7 | cryptocurrency returns 21, or nobody | eval runs of 20 Nov on 178 creators: LLM + embeddings, rules + keywords |

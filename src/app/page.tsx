@@ -104,7 +104,9 @@ export default function Page() {
       const json: SearchResponse = await res.json();
       if (id !== latest.current) return; // a newer search already answered
       asked.current = "query" in body ? body.query.trim() : summarize(json.parsed);
-      setData(json); setError(null); setFocus(-1); setSort("match"); setLoading(false);
+      setData(json); setError(null); setFocus(-1); setLooking(false); setSort("match"); setLoading(false);
+      // A new answer starts at its first row, wherever the last one was scrolled to.
+      window.scrollTo({ top: 0 });
     } catch {
       if (id !== latest.current) return;
       setError("Search didn't respond. Check that the dev server is running, then search again.");
@@ -151,7 +153,8 @@ export default function Page() {
       }
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "/") { e.preventDefault(); input.current?.focus(); input.current?.select(); return; }
-      if (!all.length) return;
+      // While a search is running the cards on screen are the old answer: keys must not act on them.
+      if (!all.length || loading) return;
 
       const cols = sheet.current ? getComputedStyle(sheet.current).gridTemplateColumns.split(" ").length : 1;
       const step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: cols, ArrowUp: -cols }[e.key];
@@ -171,14 +174,15 @@ export default function Page() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [all, focus, toggle]);
+  }, [all, focus, toggle, loading]);
 
   // Quick look covers the page, so the page behind it should not scroll.
+  const lookOpen = looking && focus >= 0;
   useEffect(() => {
-    if (!looking) return;
+    if (!lookOpen) return;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
-  }, [looking]);
+  }, [lookOpen]);
 
   const copyShortlist = async () => {
     try {
@@ -296,7 +300,7 @@ export default function Page() {
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-3 pb-1">
           <div className="flex min-h-7 min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5" aria-live="polite">
             <h1 className="text-[15px] font-medium whitespace-nowrap">
-              {first && "Loading the roster"}
+              {first && "Loading creators"}
               {data && (data.offRoster.length > 0
                 ? `${main.length} on the roster, ${off.length} not yet`
                 : `${main.length} ${main.length === 1 ? "creator" : "creators"}`)}

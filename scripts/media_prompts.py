@@ -268,8 +268,18 @@ def polish(c: dict) -> str:
 def build(c: dict) -> dict:
     rng = random.Random(f"media-{c['id']}")
     who = look(c, rng)
+    # The headliners (c171 on): the roster's biggest glam names get a finished, striking look.
+    glam = int(c["id"][1:]) > 170
+    if glam:
+        g = random.Random(f"glam-{c['id']}")
+        who["feature"] = g.choice(["sharp winged eyeliner", "thin gold hoop earrings", "a beauty mark above the lip", "deep dimples",
+                                   "strong dark eyebrows", "a small gold nose stud", "high cheekbones and a bright smile"])
+        who["build"] = g.choice(["slim", "tall and slender", "curvy", "petite", "medium athletic build"])
     noun, pron = ("man", "his") if who["man"] else ("woman", "her")
     person = (f"a {who['age']}-year-old {who['heritage']} {noun}, {who['hair']}, {who['feature']}, {who['build']}")
+    if glam:
+        person = ("a strikingly beautiful " + person[2:] + ", with polished soft-glam makeup, glowing skin and glossy, "
+                  "freshly styled hair, the look of a successful beauty creator")
 
     # Illustrate five of the six posts. For men, pass over the posts whose scene would not fit, when there is a choice.
     # Only the six seeded posts. The extra posts two profiles carry (EXTRA_POSTS in seed.py)
@@ -290,6 +300,10 @@ def build(c: dict) -> dict:
     tail = (f"{polish(c)} Natural skin texture with visible pores, no retouching, no beauty filter. "
             "Ordinary rectangular frame. No brand logos, no readable text, no watermark.")
     # The second wave (c121 on) was generated after the first batch's lessons, so its prompts say them outright.
+    if glam:
+        tail = ("Flattering light and a well-composed frame with an aspirational, polished feel, like the feed of a creator with a "
+                "large following. A real photograph of a real-looking person, not an advert, not a render: skin still has texture. "
+                "Ordinary rectangular frame. No brand logos, no readable text, no watermark.")
     if int(c["id"][1:]) > 120:
         tail += (" One single full-frame photograph, not a screenshot, no border, no collage. Clothing is plain with no lettering. "
                  "All packaging and bottles are completely blank. Fully and modestly dressed.")

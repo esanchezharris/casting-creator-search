@@ -233,6 +233,8 @@ def build(n: int, seed: int) -> list[dict]:
 
     creators = [creator(rnd, i, *names[i], stages[i]) for i in range(n)]
     creators += glam_wave(names[n:], n, seed)
+    used = {c["name"] for c in creators}
+    creators += headliners([x for x in names if f"{x[0]} {x[1]}" not in used], len(creators), seed)
     add_extra_posts(creators)
     add_reactions(creators)
     return creators
@@ -309,8 +311,53 @@ def glam_wave(names: list[tuple[str, str]], start: int, seed: int) -> list[dict]
     return out
 
 
+# A third, small group: the roster's biggest glam names. High reach, all signed, and only the
+# posts that show a finished look (scripts/media_prompts.py gives them a more polished style).
+HEADLINER_PRIMARY = ["beauty"] * 5 + ["fashion"] * 2 + ["hair"]
+HEADLINER_PAIRS = {"beauty": ["fashion", "hair"], "fashion": ["beauty"], "hair": ["beauty"]}
+HEADLINER_CAPTIONS = {
+    "beauty": [
+        "Get ready with me for a rooftop dinner. Soft glam, glossy lip.",
+        "Soft glam for a wedding: the exact products and the order I use them.",
+        "Red lip, nothing else. How to make it last through dinner.",
+        "Glam at 6am for a shoot. What long-wear actually means.",
+        "Lash extensions versus a good mascara: three weeks of each.",
+        "Fresh set: almond nails in a milky pink, and how I make them last.",
+        "Foundation wear test: twelve hours, no touch-ups.",
+        "Bronzer placement that changed my whole face shape.",
+    ],
+    "fashion": [
+        "The little black dress, styled four ways.",
+        "Date night outfits, three budgets.",
+        "What I wore to fashion week, day by day.",
+        "Gold jewellery stack I wear every day, and what it cost.",
+        "Wedding guest dress try-on, all under a hundred dollars.",
+        "Outfit of the day for a gallery opening.",
+    ],
+    "hair": [
+        "Sleek blowout at home with one round brush.",
+        "Gloss treatment at home: shine without the salon bill.",
+        "Bridal hair trial: three updos, one winner.",
+        "Claw clip styles for second-day hair.",
+        "Hair perfume and a satin pillowcase: small things that made a difference.",
+        "Going from box dye brunette to copper: the whole process.",
+    ],
+}
+
+
+def headliners(names: list[tuple[str, str]], start: int, seed: int) -> list[dict]:
+    rnd = random.Random(f"wave3-{seed}")
+    women = [n for n in names if n[0] not in MEN][:len(HEADLINER_PRIMARY)]
+    primaries = list(HEADLINER_PRIMARY)
+    rnd.shuffle(primaries)
+    return [creator(rnd, start + k, first, last, "roster", primary_pool=[primaries[k]], pairs=HEADLINER_PAIRS,
+                    captions=HEADLINER_CAPTIONS, followers=(350_000, 900_000), reach=(0.9, 1.6))
+            for k, (first, last) in enumerate(women)]
+
+
 def creator(rnd: random.Random, i: int, first: str, last: str, stage: str, primary_pool: list[str] = PRIMARY,
-            pairs: dict[str, list[str]] = PAIRS, captions: dict[str, list[str]] = CAPTIONS, avoid: tuple[str, ...] = ()) -> dict:
+            pairs: dict[str, list[str]] = PAIRS, captions: dict[str, list[str]] = CAPTIONS, avoid: tuple[str, ...] = (),
+            followers: tuple[int, int] = (8_000, 900_000), reach: tuple[float, float] = (0.25, 1.6)) -> dict:
     """One creator. The order of the random draws here is what keeps a reseed identical."""
     if True:
         primary = rnd.choice(primary_pool)
@@ -320,13 +367,15 @@ def creator(rnd: random.Random, i: int, first: str, last: str, stage: str, prima
         city, region, country = rnd.choice(CITIES)
 
         # Log-uniform followers between 8K and 900K.
-        followers = int(math.exp(rnd.uniform(math.log(8_000), math.log(900_000))))
+        f_lo, f_hi = followers
+        r_lo, r_hi = reach
+        followers = int(math.exp(rnd.uniform(math.log(f_lo), math.log(f_hi))))
         followers = round(followers, -2)
         # Smaller accounts tend to have higher engagement.
         base = 7.5 - 1.1 * math.log10(followers / 8_000) * 2.2
         engagement = round(max(1.2, base + rnd.uniform(-1.0, 1.0)), 1)
         # Reach is only loosely tied to followers: some small accounts out-reach big ones.
-        reach = round(followers * math.exp(rnd.uniform(math.log(0.25), math.log(1.6))), -2)
+        reach = round(followers * math.exp(rnd.uniform(math.log(r_lo), math.log(r_hi))), -2)
 
         # Audience location is drawn on its own, not from where the creator lives.
         band = rnd.random()

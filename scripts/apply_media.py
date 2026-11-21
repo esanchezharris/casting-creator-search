@@ -38,6 +38,12 @@ def main() -> None:
         plan = plans.get(c["id"], [])
         post_of = {n: plan[n - 1] if n <= len(plan) else n for n in numbers}
         numbers = [n for n in numbers if post_of[n] < len(c["captions"])]
+        # The headliners (c171 on) lead with their first photo, the portrait every other photo was
+        # matched to: its post takes the most recent date. Doing it twice changes nothing.
+        if int(c["id"][1:]) > 170 and 1 in post_of:
+            days, hero = c["postDays"], post_of[1]
+            newest = days.index(min(days))
+            days[hero], days[newest] = days[newest], days[hero]
         numbers.sort(key=lambda n: (c["postDays"][post_of[n]], n))
         c["images"] = [f"/creators/{c['id']}/{n}.jpg" for n in numbers]
         c["photoPosts"] = [post_of[n] for n in numbers]

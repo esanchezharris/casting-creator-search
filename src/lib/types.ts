@@ -58,7 +58,7 @@ export type LocationFilter = {
 export type ParsedQuery = {
   niches: string[];
   locations: LocationFilter[];
-  /** Empty means "roster first": roster creators, then the rest if the roster is thin. */
+  /** Empty means every stage. With a topic in the brief, the roster is then listed first and the rest only if the roster is thin. */
   stages: Stage[];
   /** Empty means anyone. */
   genders: Gender[];
