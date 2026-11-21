@@ -21,7 +21,7 @@ export const SORTS: [Sort, string][] = [
 /** How many filters are set, for the badge on the button that reopens the panel. */
 export const activeCount = (q: ParsedQuery) =>
   q.niches.length + q.locations.length + q.stages.length + q.genders.length
-  + [q.minAge ?? q.maxAge, q.minFollowers ?? q.maxFollowers, q.minEngagement, q.minAudienceUS, q.semantic || null].filter((v) => v != null).length;
+  + [q.minAge ?? q.maxAge, q.minFollowers ?? q.maxFollowers, q.maxRate, q.minEngagement, q.minAudienceUS, q.semantic || null].filter((v) => v != null).length;
 
 // The follower slider is logarithmic, because the roster runs from a few thousand to about a
 // million and the interesting differences are at the small end. Either end stop means "no limit".
@@ -141,6 +141,11 @@ export function FilterPanel({ parsed: q, places, facets, onChange }: Props) {
   const ageLabel = young == null && old == null ? "Any"
     : young != null && old != null ? `${young} to ${old}` : young != null ? `${young} or over` : `${old} or under`;
 
+  // Rate: the right end stop means no limit.
+  const R_MAX = 20_000;
+  const [rate, setRate] = useState(q.maxRate ?? R_MAX);
+  useEffect(() => setRate(q.maxRate ?? R_MAX), [q.maxRate]);
+
   const pill = "press h-7 rounded-md border bg-card px-2 text-[13px] hover:border-foreground";
 
   return (
@@ -194,6 +199,23 @@ export function FilterPanel({ parsed: q, places, facets, onChange }: Props) {
           to
           <Typed label="Followers to" placeholder="Max" value={q.maxFollowers != null ? compact(q.maxFollowers) : ""} onCommit={(t) => onChange({ ...q, maxFollowers: parseCount(t) })} />
         </div>
+      </Section>
+
+      <Section title="Rate per reel" value={rate >= R_MAX ? "Any" : `Up to $${compact(rate)}`}>
+        <div className="flex items-center gap-3">
+          <Slider
+            labels={["Highest rate per reel"]} className="flex-1" min={500} max={R_MAX} step={500} value={[rate]}
+            onValueChange={(v) => setRate((v as number[])[0])}
+            onValueCommitted={(v) => onChange({ ...q, maxRate: (v as number[])[0] >= R_MAX ? null : (v as number[])[0] })}
+          />
+          <span className="w-[68px] shrink-0">
+            <Typed
+              label="Highest rate per reel, typed" placeholder="Any" value={q.maxRate != null ? `$${compact(q.maxRate)}` : ""}
+              onCommit={(t) => onChange({ ...q, maxRate: parseCount(t.replace("$", "")) })}
+            />
+          </span>
+        </div>
+        <p className="mt-2 text-[13px] leading-snug text-muted-foreground">Only roster creators have an agreed rate. The others are not ruled out by it.</p>
       </Section>
 
       <MinSlider

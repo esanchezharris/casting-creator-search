@@ -16,7 +16,7 @@ import { Segmented } from "@/components/Segmented";
 import { useElastic } from "@/lib/elastic";
 import type { Creator, SearchResponse, SearchResult } from "@/lib/types";
 
-const NO_FILTERS = { niches: [], locations: [], stages: [], genders: [], minAge: null, maxAge: null, minFollowers: null, maxFollowers: null, minEngagement: null, minAudienceUS: null, semantic: "" };
+const NO_FILTERS = { niches: [], locations: [], stages: [], genders: [], minAge: null, maxAge: null, minFollowers: null, maxFollowers: null, maxRate: null, minEngagement: null, minAudienceUS: null, semantic: "" };
 const PANEL = "casting.filters.v1";
 const KEYS: [string[], string][] = [
   [["←", "→", "↑", "↓"], "Move between creators"], [["Space"], "Open or close quick look"], [["S"], "Shortlist the focused creator"],

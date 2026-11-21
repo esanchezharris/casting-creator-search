@@ -18,6 +18,8 @@ export function applyFilters(q: ParsedQuery): Creator[] {
     if (q.maxAge != null && c.age > q.maxAge) return false;
     if (q.minFollowers != null && c.followers < q.minFollowers) return false;
     if (q.maxFollowers != null && c.followers > q.maxFollowers) return false;
+    // A budget can only rule out someone whose rate is known. Applicants and prospects have none yet.
+    if (q.maxRate != null && c.rate != null && c.rate > q.maxRate) return false;
     if (q.minEngagement != null && c.engagement < q.minEngagement) return false;
     if (q.minAudienceUS != null && c.audience.us < q.minAudienceUS) return false;
     return true;

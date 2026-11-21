@@ -52,7 +52,7 @@ def filters_ok(expected: dict, parsed: dict) -> bool:
         if key in expected and expected[key] != parsed[key]:
             return False
     # Age too is checked on every case, for the same reason as gender.
-    for key in ("minAge", "maxAge"):
+    for key in ("minAge", "maxAge", "maxRate"):
         if expected.get(key) != parsed.get(key):
             return False
     return True
@@ -71,6 +71,8 @@ def passes(c: dict, f: dict) -> bool:
     if f.get("locations") and not any(v in (c["city"], c["region"], c["country"]) for v in f["locations"]):
         return False
     if f.get("genders") and c["gender"] not in f["genders"]:
+        return False
+    if f.get("maxRate") and c["rate"] is not None and c["rate"] > f["maxRate"]:
         return False
     if f.get("minAge") and c["age"] < f["minAge"]:
         return False

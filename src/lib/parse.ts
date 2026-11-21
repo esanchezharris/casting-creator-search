@@ -5,7 +5,7 @@ import { Creator, GENDERS, LocationFilter, NICHES, ParsedQuery, Stage, STAGES } 
 const creators = creatorsJson as Creator[];
 
 export const emptyQuery = (): ParsedQuery => ({
-  niches: [], locations: [], stages: [], genders: [], minAge: null, maxAge: null, minFollowers: null, maxFollowers: null,
+  niches: [], locations: [], stages: [], genders: [], minAge: null, maxAge: null, minFollowers: null, maxFollowers: null, maxRate: null,
   minEngagement: null, minAudienceUS: null, semantic: "",
 });
 
@@ -109,7 +109,8 @@ const FILLER = new Set(("a an the and or of in on at to for from with who whos t
   "do does doing did post posts posting posted talk talks talking about content make makes making mention mentions " +
   "followers follower following audience has have having their them they i want need looking some any " +
   "whose us we our show list get please brief campaign launch yet already currently " +
-  "age aged ages old older younger years year").split(" "));
+  "age aged ages old older younger years year " +
+  "budget each per reel rate brand brands least most more less than only").split(" "));
 
 const NUM = String.raw`(\d+(?:[.,]\d+)?)\s*((?:thousand|million|k|m)(?![a-z]))?`;
 
@@ -145,6 +146,18 @@ export function parseWithRules(query: string): ParsedQuery {
   // Gender, only from plain words. "Women's running shoes" is a topic, so a possessive is left alone.
   take(/(?<![a-z])(?:women|woman|females?|ladies|girls)(?![a-z'’])/, () => { out.genders.push("woman"); });
   take(/(?<![a-z])(?:men|man|males?|guys)(?![a-z'’])/, () => { out.genders.push("man"); });
+
+  // Budget: a dollar amount is what the brief can pay one creator ("budget $2,000 each", "under $5k a reel").
+  // A total for the whole campaign says nothing about one creator's rate, so it is only removed.
+  {
+    const LEAD = String.raw`(?:(?:with\s+)?(?:a\s+)?(?:total\s+|overall\s+)?(?:budget|rate)s?\s+(?:of\s+|is\s+|around\s+|up to\s+|under\s+)?|(?:under|below|up to|at most|max(?:imum)?|less than|for)\s+)?`;
+    const AMOUNT = String.raw`\$\s*(\d[\d,]*(?:\.\d+)?)\s*(k(?![a-z]))?`;
+    const TAIL = String.raw`(?:\s+(?:in\s+)?(?:total|overall|altogether|budget))?(?:\s+(?:each|per\s+(?:creator|person|post|reel|video)|a\s+(?:creator|post|reel|video|piece)|or\s+(?:less|under)))*`;
+    take(new RegExp(LEAD + AMOUNT + TAIL), (m) => {
+      const v = Math.round(parseFloat(m[1].replace(/,/g, "")) * (m[2] ? 1000 : 1));
+      if (v > 0 && !/total|overall|altogether/.test(m[0])) out.maxRate = v;
+    });
+  }
 
   // Age, before every other number. A bare two-digit number after "over" or "under" is an age
   // ("over 30"); with K, M, % or "followers" after it, it is left for the rules below ("over 30K").
@@ -193,6 +206,8 @@ export function parseWithRules(query: string): ParsedQuery {
   const pct = (v: string) => Math.max(0, Math.min(100, parseFloat(v)));
   take(new RegExp(String.raw`(?:at least |over |above |more than )?(\d{1,3})\s*%\s*\+?\s*(?:or more )?${US}[- ]?(?:based )?\s*${AUD}`), (m) => { out.minAudienceUS = pct(m[1]); })
   || take(new RegExp(String.raw`${AUD}\s+(?:(?:that'?s|that is|that are|who are|is|are)\s+)?(?:at least |over |above |more than )?(\d{1,3})\s*%\s*\+?\s*(?:in |from )?(?:the )?${US}`), (m) => { out.minAudienceUS = pct(m[1]); })
+  // "US audience 60%+", "US audience of at least 60%": the figure after the words.
+  || take(new RegExp(String.raw`${US}[- ]?(?:based )?\s*${AUD}\s*(?:of |at |is |:)?\s*(?:at least |over |above |more than )?(\d{1,3})\s*%\s*\+?(?:\s*or more)?`), (m) => { out.minAudienceUS = pct(m[1]); })
   // No number given: "mostly" is read as at least half.
   || take(new RegExp(String.raw`(?:(?:mostly|mainly|majority|primarily|largely|predominantly|strong|big)\s+)?${US}[- ]?(?:based )?\s*${AUD}`), () => { out.minAudienceUS = 50; })
   || take(new RegExp(String.raw`${AUD}\s+(?:(?:that'?s|that is|that are|who are|is|are)\s+)?(?:(?:mostly|mainly|primarily|largely|based)\s+)?(?:in|from)\s+(?:the )?${US}`), () => { out.minAudienceUS = 50; });
@@ -296,16 +311,17 @@ Return only a JSON object with these keys:
 - "minEngagement": number (percent) or null.
 - "stages": array, each one of ["roster","applicant","prospect"]. Empty unless the request says so. "signed" or "on the roster" means ["roster"]. "applicants" means ["applicant"]. "prospects" means ["prospect"]. "not signed yet" or "worth signing" means ["applicant","prospect"].
 - "genders": array, each one of ["woman","man"]. Empty unless the request asks for women or men ("female creators", "guys who..."). A product for women or men ("women's running shoes") is a topic, not a gender.
+- "maxRate": the most the brief can pay one creator, in dollars, or null. "budget $2,000 each" means 2000. A total campaign budget is not a rate: leave null.
 - "minAge", "maxAge": the creator's own age in whole years, both ends included, or null. "over 30" means minAge 31, "under 25" means maxAge 24, "in their twenties" means 20 to 29. An age is never a follower count.
 - "minAudienceUS": number 0-100 or null. The minimum share of the creator's AUDIENCE that is in the US. "US audience" or "mostly American followers" with no number means 50. This is about followers, not where the creator lives: "in Florida" is a location, not an audience filter.
 - "semantic": the topic, product or vibe to match against their posts, as a short phrase. Empty string if the request is filters only. It is matched against post captions and CRM notes, so "open to paid usage" or "delivers early" belong here. Never repeat a niche, place, stage or number here.
 
 Examples:
-"micro foodies in Chicago with a mostly US audience who post about air fryers" -> {"niches":["food"],"locations":["Chicago"],"stages":[],"genders":[],"minAge":null,"maxAge":null,"minFollowers":10000,"maxFollowers":100000,"minEngagement":null,"minAudienceUS":50,"semantic":"air fryers"}
-"applicants who post about trail shoes" -> {"niches":[],"locations":[],"stages":["applicant"],"genders":[],"minAge":null,"maxAge":null,"minFollowers":null,"maxFollowers":null,"minEngagement":null,"minAudienceUS":null,"semantic":"trail shoes"}
-"women who run and review men's trail shoes" -> {"niches":["running"],"locations":[],"stages":[],"genders":["woman"],"minAge":null,"maxAge":null,"minFollowers":null,"maxFollowers":null,"minEngagement":null,"minAudienceUS":null,"semantic":"men's trail shoes"}
-"fitness creators who are over 30" -> {"niches":["fitness"],"locations":[],"stages":[],"genders":[],"minAge":31,"maxAge":null,"minFollowers":null,"maxFollowers":null,"minEngagement":null,"minAudienceUS":null,"semantic":""}
-"a snack for after the gym" -> {"niches":[],"locations":[],"stages":[],"genders":[],"minAge":null,"maxAge":null,"minFollowers":null,"maxFollowers":null,"minEngagement":null,"minAudienceUS":null,"semantic":"a snack for after the gym"}`;
+"micro foodies in Chicago with a mostly US audience who post about air fryers" -> {"niches":["food"],"locations":["Chicago"],"stages":[],"genders":[],"minAge":null,"maxAge":null,"minFollowers":10000,"maxFollowers":100000,"maxRate":null,"minEngagement":null,"minAudienceUS":50,"semantic":"air fryers"}
+"applicants who post about trail shoes" -> {"niches":[],"locations":[],"stages":["applicant"],"genders":[],"minAge":null,"maxAge":null,"minFollowers":null,"maxFollowers":null,"maxRate":null,"minEngagement":null,"minAudienceUS":null,"semantic":"trail shoes"}
+"women who run and review men's trail shoes" -> {"niches":["running"],"locations":[],"stages":[],"genders":["woman"],"minAge":null,"maxAge":null,"minFollowers":null,"maxFollowers":null,"maxRate":null,"minEngagement":null,"minAudienceUS":null,"semantic":"men's trail shoes"}
+"fitness creators who are over 30" -> {"niches":["fitness"],"locations":[],"stages":[],"genders":[],"minAge":31,"maxAge":null,"minFollowers":null,"maxFollowers":null,"maxRate":null,"minEngagement":null,"minAudienceUS":null,"semantic":""}
+"a snack for after the gym" -> {"niches":[],"locations":[],"stages":[],"genders":[],"minAge":null,"maxAge":null,"minFollowers":null,"maxFollowers":null,"maxRate":null,"minEngagement":null,"minAudienceUS":null,"semantic":"a snack for after the gym"}`;
 
 export const llmConfigured = () => !!process.env.OPENAI_API_KEY;
 
@@ -334,6 +350,8 @@ export function sanitize(raw: unknown): ParsedQuery {
     out.stages = STAGES.filter((st) => (r.stages as unknown[]).some((x) => typeof x === "string" && x.toLowerCase() === st));
   if (Array.isArray(r.genders))
     out.genders = GENDERS.filter((g) => (r.genders as unknown[]).some((x) => typeof x === "string" && x.toLowerCase() === g));
+  const rate = num(r.maxRate);
+  out.maxRate = rate == null ? null : Math.round(rate);
   const age = (v: unknown) => { const n = num(v); return n == null ? null : Math.max(16, Math.min(80, Math.round(n))); };
   out.minAge = age(r.minAge);
   out.maxAge = age(r.maxAge);
@@ -368,6 +386,11 @@ export async function parseWithLLM(query: string): Promise<ParsedQuery> {
   if (!parsed.semantic) parsed.semantic = rules.semantic;
   // Gender is read from plain words, which the rules do exactly; the model is not asked to guess it.
   parsed.genders = rules.genders;
+  // So is a budget, and neither the amount nor the words around a campaign belong in the topic.
+  parsed.maxRate = rules.maxRate;
+  parsed.semantic = parsed.semantic
+    .replace(/(?:budget\s+(?:of\s+)?)?\$\s*\d[\d,.]*k?(?:\s+(?:each|per\s+\w+|budget))?/gi, " ")
+    .replace(/\s+(?:launch|campaign|brand)\s*$/i, "").replace(/^for\s+(?:an?\s+|the\s+)?/i, "").replace(/\s+/g, " ").trim();
   // Age is read the same way. And when the only number in the sentence was an age, a follower
   // bound from the model is that age misread ("over 30" came back as over 500K followers).
   parsed.minAge = rules.minAge;

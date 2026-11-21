@@ -286,3 +286,31 @@ who post about cryptocurrency trading" rules + keywords returned nobody and
 LLM + embeddings returned 21 people. The held-out set is 10 briefs, 5 of them
 with a topic, so its figures move a lot on one brief. LLM + keywords and
 rules + embeddings were not rerun on this data.
+
+## Addendum: budget filter and final numbers (20 Nov 2026, last run)
+
+A dollar amount in a brief is now a filter: the most one creator can be paid
+for a reel ("budget $2,000 each", "under $5k a reel"). It rules out only
+creators with a known, higher rate; applicants and prospects have no rate. A
+total campaign budget is read and discarded. "US audience 60%+" (figure after
+the words) is now read too. Both are read by the rules, and the eval fails
+any case where a budget is read that was not asked for. Five briefs were
+added (70 in all, marked `"added": "budget"`); they are tuned cases.
+
+| Mode | Tuned filters | Tuned P@5 | Tuned recall | Tuned nobody-fits | Held-out filters | Held-out P@5 | Held-out recall | Held-out nobody-fits |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Rules + keywords | 60/60 | 0.88 | 0.77 | 4/4 | 7/10 | 0.86 | 0.86 | 1/1 |
+| LLM + embeddings | 60/60 | 0.88 | 0.77 | 1/4 | 7/10 | 0.66 | 0.80 | 1/1 |
+
+Tuned precision and recall are the same in both modes. They differ when
+nobody fits: "creators who post about cryptocurrency trading" returned
+nobody with rules + keywords and 22 people with LLM + embeddings. The
+held-out drop for LLM + embeddings (0.70 and 1.00 in the previous section)
+is one brief: "creaters in Calfornia who post about meal prep" is read the
+same as before, but with eight more California-heavy roster creators in the
+ranking it now returns five roster creators, none of whom posts about meal
+prep, and that hides the one prospect who does. The held-out set has five
+topic briefs, so one brief moves it this much. A held-out brief that still
+fails in both modes, "60% or more of their audience in the US", was left
+unfixed on purpose so the set stays held out. LLM + keywords and rules +
+embeddings were not rerun.

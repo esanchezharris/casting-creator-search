@@ -67,6 +67,8 @@ export type ParsedQuery = {
   maxAge: number | null;
   minFollowers: number | null;
   maxFollowers: number | null;
+  /** The most the brief can pay one creator for a reel, in dollars. Creators with no agreed rate are not excluded by it. */
+  maxRate: number | null;
   minEngagement: number | null;
   /** Minimum share of the audience in the US, 0 to 100. */
   minAudienceUS: number | null;

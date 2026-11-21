@@ -31,6 +31,7 @@ export function summarize(q: ParsedQuery): string {
   if (q.minAge != null || q.maxAge != null) parts.push(ageText(q));
   if (q.locations.length) parts.push(`in ${q.locations.map((l) => l.label).join(" or ")}`);
   if (q.minFollowers != null || q.maxFollowers != null) parts.push(`${followerText(q)} followers`);
+  if (q.maxRate != null) parts.push(`up to $${compact(q.maxRate)} a reel`);
   if (q.minEngagement != null) parts.push(`${q.minEngagement}%+ engagement`);
   if (q.minAudienceUS != null) parts.push(`${q.minAudienceUS}%+ US audience`);
   if (q.semantic) parts.push(`posts about ${q.semantic}`);
@@ -129,7 +130,7 @@ export function FilterChips({ parsed: q, places, onChange, addClassName }: { par
     </span>
   );
 
-  const any = q.niches.length || q.locations.length || q.stages.length || q.genders.length || q.minAge != null || q.maxAge != null || has.followers || has.engagement || has.audience || q.semantic;
+  const any = q.niches.length || q.locations.length || q.stages.length || q.genders.length || q.minAge != null || q.maxAge != null || q.maxRate != null || has.followers || has.engagement || has.audience || q.semantic;
   const freeNiches = NICHES.filter((n) => !q.niches.includes(n));
   const freeStages = STAGES.filter((s) => !q.stages.includes(s));
   const typed = place.trim().toLowerCase();
@@ -146,6 +147,7 @@ export function FilterChips({ parsed: q, places, onChange, addClassName }: { par
       {(q.minAge != null || q.maxAge != null) && plain("age", ageText(q), { ...q, minAge: null, maxAge: null })}
       {q.locations.map((l) => plain(`l-${l.field}-${l.value}`, <>{dim("in")} {l.label}</>, { ...q, locations: q.locations.filter((x) => x !== l) }))}
       {has.followers && editable("followers", <>{followerText(q)} {dim("followers")}</>, { ...q, minFollowers: null, maxFollowers: null })}
+      {q.maxRate != null && plain("rate", <>{dim("up to")} ${compact(q.maxRate)} {dim("a reel")}</>, { ...q, maxRate: null })}
       {has.engagement && editable("engagement", <>{q.minEngagement}%+ {dim("engagement")}</>, { ...q, minEngagement: null })}
       {has.audience && editable("audience", <>{q.minAudienceUS}%+ {dim("US audience")}</>, { ...q, minAudienceUS: null })}
       {q.semantic && plain("s", <>{dim("posts about")} {q.semantic}</>, { ...q, semantic: "" })}

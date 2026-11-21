@@ -20,7 +20,8 @@ The LLM is not perfectly repeatable, so run each brief once before recording.
   place of the photo it was made from: a play mark shows on its frame, and it
   plays muted while the mouse is on that frame. In quick look the speaker
   button turns the sound on, and "Recent / Popular" reorders the posts.
-- Have `docs/EVAL.md` open in a second tab at its last section, "178 creators".
+- Have `docs/EVAL.md` open in a second tab at its last section, "Budget filter
+  and final numbers".
 - With nothing typed the page lists all 178 creators, every stage together,
   highest recent reach first. A brief with a topic lists the roster first.
 - A search takes one to two seconds (a language-model call and an embedding
@@ -86,14 +87,14 @@ the first five quote "Sleep routine: magnesium, no phone, lights out by ten."
 
 **7. The eval table (1:30 to 1:52)**
 
-Switch to `docs/EVAL.md`, last section ("178 creators"). Point at the two
+Switch to `docs/EVAL.md`, last section ("Budget filter and final numbers"). Point at the two
 rows of the table, then at the sentence about cryptocurrency under it.
 
-> "I measured all of it on sixty-five test briefs, in two configurations. On
-> precision they are level: 0.86 for plain rules and keywords, 0.88 for the
-> language model with embeddings. The difference is what happens when nobody
-> fits. Ask about cryptocurrency and keywords return nobody; embeddings still
-> return twenty-one people."
+> "I measured all of it on seventy test briefs, in two configurations. On
+> precision they are level: 0.88 for plain rules and keywords, and 0.88 for
+> the language model with embeddings. The difference is what happens when
+> nobody fits. Ask about cryptocurrency and keywords return nobody;
+> embeddings still return twenty-two people."
 
 **8. Close (1:52 to 2:00)**
 
@@ -110,6 +111,30 @@ Back to the app.
 | Shot 4 | conflict on the last card | app, brief 1, ninth result (Jade Santos) |
 | Shot 5 | 1 on the roster, 4 not yet | app, brief 2, LLM + embeddings |
 | Shot 6 | 7 returned, 5 about sleep | app; `docs/eval-runs/llm-embeddings.txt` (5 expected, 7 returned, P@5 1.00) |
-| Shot 7 | 65 briefs, two configurations | `docs/EVAL.md`, last section (178 creators) |
-| Shot 7 | P@5 0.86 and 0.88 | `docs/EVAL.md`, last section, tuned set: rules + keywords, LLM + embeddings |
-| Shot 7 | cryptocurrency returns 21, or nobody | eval runs of 20 Nov on 178 creators: LLM + embeddings, rules + keywords |
+| Shot 7 | 70 briefs, two configurations | `docs/EVAL.md`, last section |
+| Shot 7 | P@5 0.88 and 0.88 | `docs/EVAL.md`, last section, tuned set: rules + keywords, LLM + embeddings |
+| Shot 7 | cryptocurrency returns 22, or nobody | final eval runs of 20 Nov on 178 creators: LLM + embeddings, rules + keywords |
+
+## Other briefs that show well
+
+All run on 20 Nov 2026 in the default mode (LLM parser, embedding ranker) on
+178 creators. Counts are roster matches unless stated. Run each once before
+recording; the model is not perfectly repeatable.
+
+| Brief | Read as | Returns |
+| --- | --- | --- |
+| Women in their twenties with a mostly US audience for a lip oil launch | women, aged 20 to 29, 50%+ US audience, posts about lip oil | 4 |
+| Fashion creators in New York for a wedding guest dress campaign, budget $2,000 each | fashion, New York, up to $2K a reel, posts about wedding guest dress | 1 |
+| Beauty creators over 100K followers who do soft glam, US audience 60%+ | beauty, over 100K, 60%+ US audience, posts about soft glam | see note |
+| Women over 30 who post about retinol and barrier repair | women, aged 31 or over, skincare, posts about retinol and barrier repair | 6 |
+| Hair creators who post heatless curls, under 50K, high engagement | hair, under 50K, 5%+ engagement, posts about heatless curls | 5 |
+| Roster creators who are open to whitelisting for a foundation wear test | on the roster, topic matched against CRM notes | 9, each quoting the note "Open to whitelisting for a usage fee." |
+| Who on the roster can turn a reel around in 48 hours for a nail brand | on the roster, topic matched against CRM notes | 29, led by "Turns revisions around within 24 hours." |
+
+Note: the soft glam brief returned 11 before the audience figure was read
+correctly (it was read as 50%); the count with 60% was not rechecked in the
+browser. Briefs that do not work and should stay out of the film: anything
+with "no conflicts" or another negation (it is matched as a topic, not
+applied as a rule), a jewellery brief in a follower band where nobody posts
+about jewellery (embeddings return near misses), and a total campaign budget
+(only a per-creator amount becomes a filter).

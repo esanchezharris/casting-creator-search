@@ -780,5 +780,70 @@
       "caffeine"
     ],
     "added": "age"
+  },
+  {
+    "query": "Fashion creators in New York for a wedding guest dress campaign, budget $2,000 each",
+    "filters": {
+      "niches": [
+        "fashion"
+      ],
+      "locations": [
+        "NY"
+      ],
+      "maxRate": 2000
+    },
+    "relevant_if_caption_has": [
+      "wedding guest"
+    ],
+    "added": "budget"
+  },
+  {
+    "query": "beauty creators under $5k a reel with over 100K followers",
+    "filters": {
+      "niches": [
+        "beauty"
+      ],
+      "minFollowers": 100000,
+      "maxRate": 5000
+    },
+    "added": "budget"
+  },
+  {
+    "query": "Beauty creators over 100K followers who do soft glam, US audience 60%+",
+    "filters": {
+      "niches": [
+        "beauty"
+      ],
+      "minFollowers": 100000,
+      "minAudienceUS": 60
+    },
+    "relevant_if_caption_has": [
+      "soft glam"
+    ],
+    "added": "budget"
+  },
+  {
+    "query": "skincare creators, total budget $20,000",
+    "filters": {
+      "niches": [
+        "skincare"
+      ]
+    },
+    "added": "budget"
+  },
+  {
+    "query": "Women in their twenties with a mostly US audience for a lip oil launch",
+    "filters": {
+      "genders": [
+        "woman"
+      ],
+      "minAge": 20,
+      "maxAge": 29,
+      "minAudienceUS": 50
+    },
+    "relevant_if_caption_has": [
+      "lip oil"
+    ],
+    "added": "budget"
   }
 ]

@@ -130,6 +130,12 @@ earlier sets too average-looking. Total is 178 (115 roster).
 Default view: with no topic the search returns every stage in one list by
 recent reach. Roster-first grouping applies only when the brief has a topic.
 
+Budget (20 Nov, last): `maxRate` in `ParsedQuery`, read by the rules from a
+dollar amount, with a "Rate per reel" slider. It never rules out a creator
+with no rate. `tools/try_parse.ts` prints how the rule parser reads a brief
+(`npx tsx tools/try_parse.ts "..."`). docs/DEMO.md ends with a table of
+tested briefs.
+
 Age (20 Nov, last): each creator has `age`, drawn in `seed.py` from the same
 stream `media_prompts.py` uses, so it matches the photos. Age in a brief is
 read by the rules only ("over 30" is 31 and up; "over 30K" stays followers),
