@@ -17,7 +17,7 @@ them is a real person, and the app says so in its footer.
 
 No API key is needed. Without one the app uses the rule-based parser and
 keyword ranking. If `OPENAI_API_KEY` is set, in `.env.local` or in your shell,
-it uses the LLM parser and the embedding ranker instead; the page says which
+it uses the LLM parser and the hybrid ranker instead; the page says which
 ran, next to the result count.
 
 ## What it does
@@ -59,28 +59,27 @@ ran, next to the result count.
 
 ## How well it works
 
-`npm run eval` scores 56 test briefs. All four combinations were run on 20 Nov
-2026 (P@5 and recall on the 46 briefs the fixes were developed against, then
-on 10 held out):
+`npm run eval` scores 70 test briefs against 178 creators. All six
+combinations were run on 20 Nov 2026: 60 briefs the fixes were developed
+against ("tuned") and 10 held out.
 
-| Parser + ranker | Filters | P@5 | Recall | Says "nobody fits" when true |
-| --- | --- | --- | --- | --- |
-| rules + keywords (no key) | 46/46, held out 7/10 | 0.88, held out 0.80 | 0.77, 0.80 | 5/5 |
-| LLM + keywords | 45/46, 7/10 | 0.81, 0.80 | 0.71, 0.80 | 5/5 |
-| rules + embeddings | 46/46, 7/10 | 0.84, 0.59 | 0.79, 0.89 | 2/5 |
-| LLM + embeddings (default with a key) | 45/46, 7/10 | 0.83, 0.63 | 0.75, 1.00 | 3/5 |
+| Parser + ranker | Tuned filters | Tuned P@5 | Tuned recall | Tuned nobody-fits | Held-out filters | Held-out P@5 | Held-out recall | Held-out nobody-fits |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Rules + keywords (no key) | 60/60 | 0.88 | 0.77 | 4/4 | 7/10 | 0.86 | 0.86 | 1/1 |
+| Rules + embeddings | 60/60 | 0.88 | 0.80 | 1/4 | 7/10 | 0.62 | 0.69 | 0/1 |
+| Rules + hybrid | 60/60 | 0.96 | 0.86 | 4/4 | 7/10 | 0.86 | 0.96 | 1/1 |
+| LLM + keywords | 59/60 | 0.88 | 0.75 | 4/4 | 7/10 | 0.86 | 0.86 | 1/1 |
+| LLM + embeddings | 60/60 | 0.91 | 0.80 | 1/4 | 7/10 | 0.66 | 0.80 | 1/1 |
+| LLM + hybrid (default with a key) | 60/60 | 0.99 | 0.84 | 4/4 | 7/10 | 0.82 | 0.96 | 1/1 |
 
-Four briefs about gender were added later the same day, making 60. With them,
-rules + keywords scored 50/50 filters and P@5 0.89 on the tuned set (held out
-unchanged at 7/10 and 0.80), and LLM + embeddings scored 50/50 and 0.85 (held
-out 6/10 and 0.63 on that run). The other two combinations were not rerun, so
-the table above is the 56-brief run.
-
-On this templated data the no-key baseline is the most precise. Embeddings win
-on paraphrase ("getting better rest at night" goes from none of five right to
-five of five) and lose the ability to return nobody ("cryptocurrency trading"
-returns 8 creators). [docs/EVAL.md](docs/EVAL.md) has the definitions, what
-each fix changed, how both cutoffs were chosen and every known miss.
+The hybrid ranker lets keywords decide who is eligible and embeddings decide
+the order, and falls back to embeddings when the brief is a paraphrase. It
+keeps what each does well: "getting better rest at night" finds the five
+creators who post about sleep (keywords find none), and "cryptocurrency
+trading" returns nobody (embeddings return 22). The held-out set has five
+briefs with a topic, so its figures move a lot on one brief.
+[docs/EVAL.md](docs/EVAL.md) has the definitions, what each fix changed, how
+the cutoffs were chosen and every known miss.
 
     npm run dev
     npm run eval                                   # app must be running
@@ -90,7 +89,8 @@ each fix changed, how both cutoffs were chosen and every known miss.
 
     OPENAI_API_KEY=... npm run embed    # rewrites data/embeddings.json after a reseed
     PARSER=rules npm run dev            # force the rule parser
-    RANKER=keywords npm run dev         # force keyword ranking
+    RANKER=keywords npm run dev         # force keyword ranking (or RANKER=embeddings)
+    npm run eval -- --parser rules --ranker hybrid   # score any mode on one server
 
 `data/embeddings.json` is committed, so with a key set the embedding ranker
 works straight away. The LLM's output is never trusted as is: it is clamped to
@@ -146,4 +146,4 @@ face with different wording; the script's docstring has the details.
 
 Push to GitHub and import into Vercel. With no environment variables it runs
 the rule parser and keyword ranking. Set `OPENAI_API_KEY` there to turn on the
-LLM parser and embedding ranker.
+LLM parser and hybrid ranker.

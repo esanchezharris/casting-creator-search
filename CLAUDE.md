@@ -67,7 +67,7 @@ Everything below was run on 20 Nov 2026.
 
 Keys: there is no `.env.local`, but `OPENAI_API_KEY` and `UNSPLASH_ACCESS_KEY`
 are exported in Emilio's shell. So `npm run dev` on his machine runs the LLM
-parser and the embedding ranker by default. Force the baseline with
+parser and the hybrid ranker by default. Force the baseline with
 `PARSER=rules RANKER=keywords`.
 
 Working and measured: pipeline model (stage, partner, audience, reach, notes,
@@ -151,8 +151,14 @@ Checked in a browser at 1440px. Phone layout is out of scope: this is for a
 laptop demo. Not checked: how the elastic scroll feels on a real trackpad
 (tested with synthetic wheel events).
 
-Not built: a hybrid ranker (keywords to decide if anyone fits, embeddings to
-reorder), which docs/EVAL.md argues is the next step.
+Hybrid ranker (20 Nov, last): `rankHybrid` in `src/lib/search.ts` is the
+default with a key. Keywords decide who is eligible, embeddings order them,
+and a brief with only partial keyword matches falls back to embeddings.
+The API takes `parser: "rules"` and `ranker` per request, so
+`npm run eval -- --parser rules --ranker hybrid` scores any of the six modes
+on one server. Numbers for all six are in the last section of docs/EVAL.md
+(LLM + hybrid, tuned: P@5 0.99, recall 0.84, nobody-fits 4/4; held out 0.82,
+0.96, 1/1). Shot 5 of the demo now reads "2 on the roster, 4 not yet".
 
 Port 3000 is often taken on Emilio's machine. `npx next dev --port 3210` and
 `npm run eval -- --url http://localhost:3210` work.

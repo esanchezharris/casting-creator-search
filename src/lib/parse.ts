@@ -412,9 +412,9 @@ export async function parseWithLLM(query: string): Promise<ParsedQuery> {
 }
 
 /** LLM when configured, rules otherwise or on any failure. */
-export async function parseQuery(query: string): Promise<{ parsed: ParsedQuery; parser: "llm" | "rules" }> {
+export async function parseQuery(query: string, force?: "rules"): Promise<{ parsed: ParsedQuery; parser: "llm" | "rules" }> {
   if (!query.trim()) return { parsed: emptyQuery(), parser: "rules" };
-  if (llmConfigured() && process.env.PARSER !== "rules") {
+  if (llmConfigured() && process.env.PARSER !== "rules" && force !== "rules") {
     try {
       return { parsed: await parseWithLLM(query), parser: "llm" };
     } catch (e) {

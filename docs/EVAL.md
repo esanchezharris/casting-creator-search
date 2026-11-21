@@ -314,3 +314,79 @@ topic briefs, so one brief moves it this much. A held-out brief that still
 fails in both modes, "60% or more of their audience in the US", was left
 unfixed on purpose so the set stays held out. LLM + keywords and rules +
 embeddings were not rerun.
+
+
+## Addendum: hybrid ranker, all six modes (20 Nov 2026, after the budget filter)
+
+The hybrid ranker argued for above is built and is now the default when a key
+is set (`rankHybrid` in `src/lib/search.ts`). Keywords decide who is eligible
+and embeddings decide the order:
+
+1. No creator who passes the filters has any word of the topic: return
+   nobody.
+2. Some creator has every word of the topic ("meal prep", "wedding guest
+   outfits"): only the keyword matches (same 0.5 cutoff as the keyword
+   ranker) are eligible, ordered by embedding score. Each card quotes the
+   post that contains the words.
+3. Only partial keyword matches ("getting better rest at night" when the
+   posts say "sleep"): the brief is treated as a paraphrase and the embedding
+   ranker runs as before.
+
+All six modes were run on the same server, 178 creators, 70 briefs (60 tuned,
+10 held out). `scripts/eval.py` now takes `--parser rules` and `--ranker
+keywords|embeddings|hybrid`, which the API accepts per request. Full output
+of each run is in [eval-runs/](eval-runs/).
+
+| Parser + ranker | Tuned filters | Tuned P@5 | Tuned recall | Tuned nobody-fits | Held-out filters | Held-out P@5 | Held-out recall | Held-out nobody-fits |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Rules + keywords (no key) | 60/60 | 0.88 | 0.77 | 4/4 | 7/10 | 0.86 | 0.86 | 1/1 |
+| Rules + embeddings | 60/60 | 0.88 | 0.80 | 1/4 | 7/10 | 0.62 | 0.69 | 0/1 |
+| Rules + hybrid | 60/60 | 0.96 | 0.86 | 4/4 | 7/10 | 0.86 | 0.96 | 1/1 |
+| LLM + keywords | 59/60 | 0.88 | 0.75 | 4/4 | 7/10 | 0.86 | 0.86 | 1/1 |
+| LLM + embeddings | 60/60 | 0.91 | 0.80 | 1/4 | 7/10 | 0.66 | 0.80 | 1/1 |
+| LLM + hybrid (default with a key) | 60/60 | 0.99 | 0.84 | 4/4 | 7/10 | 0.82 | 0.96 | 1/1 |
+
+What changed, brief by brief (rule parser, so the parser is not a variable):
+
+- Nobody-fits: "cryptocurrency trading", "fitness creators in Tokyo" and
+  "Skincare in New York or Los Angeles, 50K+, sunscreen" return nobody with
+  the hybrid; embeddings returned 22, 6 and 4 people.
+- Near misses: "creaters in Calfornia who post about meal prep" goes from
+  P@5 0.00 (embeddings) to 1.00, "Runners who review shoes" from 0.50 and
+  recall 0.00 to 1.00 and 1.00, "20-100K fashion creators who do wedding
+  guest outfits" from 0.60 to 1.00.
+- Paraphrase is kept: "getting better rest at night" is 0.00 with keywords
+  and 1.00 with embeddings and the hybrid.
+
+How it was chosen, and what that means for the numbers:
+
+- The first version had only steps 1 and 2 (the keyword set, reordered). With
+  the rule parser it scored tuned P@5 0.91, recall 0.77, nobody-fits 4/4, and
+  lost every paraphrase brief ("getting better rest at night" 0.00). Step 3
+  was added after reading the per-brief comparison of the three rankers.
+- That comparison listed held-out briefs too. The rule in step 3 was written
+  for the tuned paraphrase briefs and no constant was fitted, but the
+  held-out rows were on screen when it was chosen, so the held-out figures
+  for the hybrid are weaker evidence than the earlier ones.
+- The LLM runs are not repeatable to the last digit. LLM + embeddings scored
+  tuned P@5 0.88 and recall 0.77 in the previous section and 0.91 and 0.80 in
+  this run on the same code path. Differences of 0.03 between LLM rows are
+  within that noise. The hybrid's gain over embeddings (0.96 against 0.88
+  with the rule parser, which is repeatable) is not.
+- Held-out P@5 for LLM + hybrid is 0.82, below the keyword rows (0.86): on
+  that run "people who post what they eat in a day" scored 0.80 and
+  "prospects who review protein powder" 0.50. Five topic briefs, so one
+  brief moves it by up to 0.20.
+
+What the hybrid still gets wrong:
+
+- An off-topic brief that shares one ordinary word with some post falls to
+  step 3 and gets embedding near misses. "fishing gear reviews" (not an eval
+  case) returned 60 roster creators, because posts contain "review". The
+  cases in step 1 are only briefs with no shared word at all.
+- A brief with two topics is an AND: "retinol and barrier repair" for women
+  over 30 returns the 2 creators who post about both, where embeddings
+  returned 6.
+- Recall is still low where the right answer is large and the wording
+  loose: "who talks about caffeine before the gym" and "something to drink
+  before lifting" return 5 of 17.

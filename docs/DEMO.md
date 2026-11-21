@@ -5,10 +5,10 @@ come to about 280 words, which is two minutes at an unhurried pace.
 
 Every number below was read off the app and `docs/EVAL.md` on 20 Nov 2026 with
 the default dataset (seed 11) in the mode the app runs in when
-`OPENAI_API_KEY` is set: LLM parser, embedding ranker. The line next to the
-result count should read "Read by the language model, ranked by meaning". If
-it says "rule parser", the key is not set and the counts in shots 5 and 6 will
-differ (2 on the roster instead of 1; the paraphrase in shot 6 will fail).
+`OPENAI_API_KEY` is set: LLM parser, hybrid ranker. The line next to the
+result count should read "Read by the language model, ranked by keywords and
+meaning". If it says "rule parser", the key is not set and the paraphrase in
+shot 6 will fail.
 The LLM is not perfectly repeatable, so run each brief once before recording.
 
 ## Before you record
@@ -70,10 +70,10 @@ Esc to close. Click "Copy shortlist".
 **5. The narrower brief (0:58 to 1:16)**
 
 Press `/`, change the brief to `Fitness creators in Florida who post about
-energy drinks`, press Enter. The count reads "1 on the roster, 4 not yet".
+energy drinks`, press Enter. The count reads "2 on the roster, 4 not yet".
 Scroll to the "Not on the roster yet" heading.
 
-> "Now the brand wants Florida. Only one person on the roster fits. So it also
+> "Now the brand wants Florida. Only two people on the roster fit. So it also
 > shows four applicants and prospects who do, with no rate yet. That tells a
 > talent partner who is worth signing for this brief."
 
@@ -87,37 +87,39 @@ the first five quote "Sleep routine: magnesium, no phone, lights out by ten."
 
 **7. The eval table (1:30 to 1:52)**
 
-Switch to `docs/EVAL.md`, last section ("Budget filter and final numbers"). Point at the two
-rows of the table, then at the sentence about cryptocurrency under it.
+Switch to `docs/EVAL.md`, last section ("Hybrid ranker, all six modes"). Point at the
+keywords, embeddings and hybrid rows of the table, then at the cryptocurrency line under it.
 
-> "I measured all of it on seventy test briefs, in two configurations. On
-> precision they are level: 0.88 for plain rules and keywords, and 0.88 for
-> the language model with embeddings. The difference is what happens when
-> nobody fits. Ask about cryptocurrency and keywords return nobody;
-> embeddings still return twenty-two people."
+> "I measured it on seventy test briefs. Keywords alone score 0.88 on
+> precision. Embeddings score 0.91, but ask about cryptocurrency, where
+> nobody fits, and they still return twenty-two people. So I combined them:
+> keywords decide who is eligible, meaning decides the order. That scores
+> 0.99 and returns nobody for cryptocurrency. On ten briefs I held back it
+> is 0.82, and the misses are written down."
 
 **8. Close (1:52 to 2:00)**
 
 Back to the app.
 
-> "So next is a hybrid ranker, pgvector instead of a JSON file, and real CRM
+> "So next is pgvector instead of a JSON file, more held-out briefs, and real CRM
 > data in place of the fictional roster."
 
 ## Numbers used, and where they come from
 
 | Line | Number | Source |
 | --- | --- | --- |
-| Shot 2 | 9 roster matches | app, brief 1, LLM + embeddings |
+| Shot 2 | 9 roster matches | app, brief 1, LLM + hybrid |
 | Shot 4 | conflict on the last card | app, brief 1, ninth result (Jade Santos) |
-| Shot 5 | 1 on the roster, 4 not yet | app, brief 2, LLM + embeddings |
-| Shot 6 | 7 returned, 5 about sleep | app; `docs/eval-runs/llm-embeddings.txt` (5 expected, 7 returned, P@5 1.00) |
-| Shot 7 | 70 briefs, two configurations | `docs/EVAL.md`, last section |
-| Shot 7 | P@5 0.88 and 0.88 | `docs/EVAL.md`, last section, tuned set: rules + keywords, LLM + embeddings |
-| Shot 7 | cryptocurrency returns 22, or nobody | final eval runs of 20 Nov on 178 creators: LLM + embeddings, rules + keywords |
+| Shot 5 | 2 on the roster, 4 not yet | app, brief 2, LLM + hybrid; `docs/eval-runs/llm-hybrid.txt` (6 expected, 6 returned) |
+| Shot 6 | 7 returned, 5 about sleep | app; `docs/eval-runs/llm-hybrid.txt` (5 expected, 7 returned, P@5 1.00) |
+| Shot 7 | 70 briefs | `docs/EVAL.md`, last section |
+| Shot 7 | P@5 0.88, 0.91, 0.99 | `docs/EVAL.md`, last section, tuned set (60 briefs): rules + keywords, LLM + embeddings, LLM + hybrid |
+| Shot 7 | cryptocurrency returns 22, or nobody | `docs/eval-runs/llm-embeddings.txt`, `docs/eval-runs/llm-hybrid.txt` |
+| Shot 7 | 0.82 on ten held back | `docs/EVAL.md`, last section, held-out P@5, LLM + hybrid (5 of the 10 have a topic) |
 
 ## Other briefs that show well
 
-All run on 20 Nov 2026 in the default mode (LLM parser, embedding ranker) on
+All rerun on 20 Nov 2026 in the default mode (LLM parser, hybrid ranker) on
 178 creators. Counts are roster matches unless stated. Run each once before
 recording; the model is not perfectly repeatable.
 
@@ -125,14 +127,14 @@ recording; the model is not perfectly repeatable.
 | --- | --- | --- |
 | Women in their twenties with a mostly US audience for a lip oil launch | women, aged 20 to 29, 50%+ US audience, posts about lip oil | 3 |
 | Fashion creators in New York for a wedding guest dress campaign, budget $2,000 each | fashion, New York, up to $2K a reel, posts about wedding guest dress | 1 |
-| Beauty creators over 100K followers who do soft glam, US audience 60%+ | beauty, over 100K, 60%+ US audience, posts about soft glam | 11 |
-| Women over 30 who post about retinol and barrier repair | women, aged 31 or over, skincare, posts about retinol and barrier repair | 6 |
+| Beauty creators over 100K followers who do soft glam, US audience 60%+ | beauty, over 100K, 60%+ US audience, posts about soft glam | 8 |
+| Women over 30 who post about retinol and barrier repair | women, aged 31 or over, skincare, posts about both retinol and barrier repair | 2 |
 | Hair creators who post heatless curls, under 50K, high engagement | hair, under 50K, 5%+ engagement, posts about heatless curls | 5 |
 | Roster creators who are open to whitelisting for a foundation wear test | on the roster, topic matched against CRM notes | 9, each quoting the note "Open to whitelisting for a usage fee." |
-| Who on the roster can turn a reel around in 48 hours for a nail brand | on the roster, topic matched against CRM notes | 29, led by "Turns revisions around within 24 hours." |
+| Who on the roster can turn a reel around in 48 hours for a nail brand | on the roster, topic matched against CRM notes | 18, led by "Turns revisions around within 24 hours." (the count moves with how the model words the topic) |
 
 Briefs that do not work and should stay out of the film: anything
 with "no conflicts" or another negation (it is matched as a topic, not
 applied as a rule), a jewellery brief in a follower band where nobody posts
-about jewellery (embeddings return near misses), and a total campaign budget
+about jewellery (a brief that shares one ordinary word with a post still gets near misses), and a total campaign budget
 (only a per-creator amount becomes a filter).

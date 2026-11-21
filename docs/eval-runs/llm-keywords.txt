@@ -4,12 +4,12 @@ pass         -      -  Micro beauty creators with engagement over 5%
 pass      1.00   1.00  Runners who review shoes   [8 expected, 8 returned]
 pass         -      -  Skincare in New York or Los Angeles, 50K+, sunscreen   [nobody fits, nobody returned]
 pass      1.00   0.88  creators who post about running shoes   [8 expected, 8 returned]
-pass      0.00   0.00  someone in Miami who does pilates   [1 expected, 0 returned]
+pass      1.00   1.00  someone in Miami who does pilates   [1 expected, 1 returned]
 pass         -      -  streetwear creators in London or Toronto
 pass      1.00   1.00  20-100K fashion creators who do wedding guest outfits   [3 expected, 3 returned]
 pass         -      -  hair creators over 200k
 pass      0.80   0.24  who talks about caffeine before the gym   [17 expected, 5 returned]
-pass      0.40   0.78  creators for a sunscreen launch   [9 expected, 13 returned]
+pass      1.00   0.78  creators for a sunscreen launch   [9 expected, 7 returned]
 pass      1.00   0.67  high protein recipe creators in Texas   [3 expected, 2 returned]
 pass      1.00   1.00  wellness creators in California with at least 4% engagement who talk about sleep   [1 expected, 1 returned]
 pass      1.00   0.83  marathon training content, under 50k followers   [6 expected, 5 returned]
@@ -17,20 +17,20 @@ pass         -      -  beauty creators in the UK
 pass         -      -  beauty creators with a US audience
 pass         -      -  skincare with mostly American followers in Florida
 pass         -      -  signed runners
-pass      1.00   1.00  applicants who post about sunscreen   [4 expected, 4 returned]
+pass      1.00   0.83  applicants who post about sunscreen   [6 expected, 5 returned]
 pass         -      -  fashion creators not signed yet
-pass      1.00   1.00  roster creators open to paid usage   [5 expected, 5 returned]
+pass      1.00   1.00  roster creators open to paid usage   [9 expected, 9 returned]
 pass      1.00   0.24  something to drink before lifting   [17 expected, 5 returned]
-pass      0.00   0.00  stuff that keeps your face from burning at the beach   [9 expected, 8 returned]
-pass      0.80   0.62  footwear for long distance   [8 expected, 8 returned]
-pass      0.00   0.00  getting better rest at night   [5 expected, 5 returned]
-pass      0.40   0.80  hair ties for the gym   [5 expected, 9 returned]
-pass      1.00   0.50  fitness creators who post about running   [6 expected, 3 returned]
+pass      0.00   0.00  stuff that keeps your face from burning at the beach   [9 expected, 5 returned]
+pass      0.20   0.62  footwear for long distance   [8 expected, 16 returned]
+pass      0.00   0.00  getting better rest at night   [5 expected, 6 returned]
+pass      0.20   0.33  hair ties for the gym   [9 expected, 19 returned]
+FAIL      1.00   0.17  fitness creators who post about running   [6 expected, 7 returned]
+                       parsed: {"niches": ["fitness", "running"], "semantic": "running"}
 pass      1.00   1.00  food creators who talk about marathon training   [7 expected, 7 returned]
 pass         -      -  beauty creators with a quarter million plus
 pass         -      -  fitness creators between fifty and a hundred thousand followers
-FAIL         -      -  streetwear creators with no more than 30,000 followers
-                       parsed: {"niches": ["streetwear"], "minFollowers": 10000, "maxFollowers": 30000}
+pass         -      -  streetwear creators with no more than 30,000 followers
 pass         -      -  skincare creators, 10k–50k
 pass         -      -  hair creators in Texas or Georgia
 pass      1.00   1.00  fitness creators in Miami and Orlando who post about protein   [1 expected, 1 returned]
@@ -43,7 +43,7 @@ pass         -      -  fitness creators in Tokyo   [nobody fits, nobody returned
 pass         -      -  prospects in California with a mostly American audience
 pass      1.00   1.00  creators we haven't signed who post about pilates   [4 expected, 4 returned]
 pass         -      -  lifestyle creators with 70%+ US followers
-pass      1.00   1.00  who on the roster declines gifting   [2 expected, 2 returned]
+pass      1.00   1.00  who on the roster declines gifting   [10 expected, 10 returned]
 pass      1.00   1.00  Fitness creators in Florida who post about energy drinks   [6 expected, 6 returned]
 pass         -      -  UK based creators with a US audience
 FAIL         -      -  sneakerheads in New York
@@ -51,16 +51,30 @@ FAIL         -      -  sneakerheads in New York
 pass         -      -  yoga teachers with over 80k followers
 FAIL         -      -  makeup tutorials from creators in Chicago   [nobody fits, nobody returned]
                        parsed: {"niches": ["beauty"], "locations": ["Chicago"], "semantic": "makeup tutorials"}
-pass      0.50   0.50  anyone under 20k who posts thrift hauls   [2 expected, 2 returned]
+pass      0.80   0.80  anyone under 20k who posts thrift hauls   [5 expected, 5 returned]
 FAIL         -      -  roster talent in Texas with 60% or more of their audience in the US
-                       parsed: {"locations": ["TX"], "stages": ["roster"], "minAudienceUS": 50, "semantic": "60 more"}
+                       parsed: {"locations": ["TX"], "stages": ["roster"], "minAudienceUS": 50, "semantic": "60"}
 pass      1.00   1.00  creaters in Calfornia who post about meal prep   [1 expected, 1 returned]
 pass         -      -  top beauty and haircare creators, half a million and up
 pass      0.50   0.50  prospects who review protein powder   [2 expected, 2 returned]
 pass      1.00   1.00  cold plunge content from signed creators   [8 expected, 8 returned]
-pass      1.00   1.00  people who post what they eat in a day   [7 expected, 7 returned]
+pass      1.00   1.00  people who post what they eat in a day   [7 expected, 9 returned]
+pass      1.00   0.86  Women who post about energy drinks   [14 expected, 12 returned]
+pass      1.00   0.75  Male skincare creators who post about sunscreen   [4 expected, 3 returned]
+pass         -      -  Fitness guys in Los Angeles
+pass      1.00   0.75  Runners who review women's running shoes   [8 expected, 6 returned]
+pass         -      -  fitness creators who are over 30
+pass         -      -  foodies aged 25 to 34
+pass         -      -  men older than thirty-two
+pass         -      -  runners with over 30k followers
+pass      1.00   0.90  creators in their twenties who post about energy drinks   [10 expected, 9 returned]
+pass      1.00   1.00  Fashion creators in New York for a wedding guest dress campaign, budget $2,000 each   [1 expected, 1 returned]
+pass         -      -  beauty creators under $5k a reel with over 100K followers
+pass      1.00   1.00  Beauty creators over 100K followers who do soft glam, US audience 60%+   [8 expected, 8 returned]
+pass         -      -  skincare creators, total budget $20,000
+pass      1.00   1.00  Women in their twenties with a mostly US audience for a lip oil launch   [3 expected, 3 returned]
 
 parser=llm ranker=keywords; parser=llm ranker=none (no topic)
-all: filters 52/56, mean P@5 0.81 and mean recall 0.73 over 29 topic queries, nobody-fits 5/5
-tuned on: filters 45/46, mean P@5 0.81 and mean recall 0.71 over 24 topic queries, nobody-fits 4/4
-held out: filters 7/10, mean P@5 0.80 and mean recall 0.80 over 5 topic queries, nobody-fits 1/1
+all: filters 66/70, mean P@5 0.88 and mean recall 0.77 over 36 topic queries, nobody-fits 5/5
+tuned on: filters 59/60, mean P@5 0.88 and mean recall 0.75 over 31 topic queries, nobody-fits 4/4
+held out: filters 7/10, mean P@5 0.86 and mean recall 0.86 over 5 topic queries, nobody-fits 1/1

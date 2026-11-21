@@ -18,6 +18,7 @@ prospects only when fewer than five roster creators qualify.
 Start the app first (npm run dev), then:
     python3 scripts/eval.py
     python3 scripts/eval.py --url http://localhost:3210
+    python3 scripts/eval.py --parser rules --ranker keywords   # force a mode on the same server
 """
 import argparse
 import json
@@ -30,9 +31,12 @@ CREATORS = json.loads((HERE.parent / "data" / "creators.json").read_text())
 ROSTER_MIN = 5  # keep in step with src/lib/search.ts
 
 
+FORCE: dict = {}  # parser / ranker to force, from the command line
+
+
 def call(url: str, query: str) -> dict:
     req = urllib.request.Request(
-        f"{url}/api/search", data=json.dumps({"query": query}).encode(),
+        f"{url}/api/search", data=json.dumps({"query": query, **FORCE}).encode(),
         headers={"content-type": "application/json"})
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.load(r)
@@ -135,7 +139,10 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default="http://localhost:3000")
     ap.add_argument("--quiet", action="store_true", help="only print the summary")
+    ap.add_argument("--parser", choices=["rules"], help="force the rule parser")
+    ap.add_argument("--ranker", choices=["keywords", "embeddings", "hybrid"], help="force a ranker")
     args = ap.parse_args()
+    FORCE.update({k: v for k, v in (("parser", args.parser), ("ranker", args.ranker)) if v})
 
     rows = [score(args.url, case) for case in CASES]
     if not args.quiet:

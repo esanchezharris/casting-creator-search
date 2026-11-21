@@ -148,7 +148,8 @@ async function embedQuery(text: string, file: EmbeddingFile): Promise<number[]> 
 const EMBED_FLOOR = Number(process.env.EMBED_FLOOR ?? 0);
 const EMBED_CUTOFF = Number(process.env.EMBED_CUTOFF ?? 0.8);
 
-async function rankByEmbeddings(pool: Creator[], semantic: string): Promise<SearchResult[]> {
+/** Every creator in the pool scored against the topic, with no cutoff. */
+async function embedScores(pool: Creator[], semantic: string): Promise<SearchResult[]> {
   const file = loadEmbeddings()!;
   const q = await embedQuery(semantic, file);
   const ranked = pool.map((creator) => {
@@ -165,6 +166,11 @@ async function rankByEmbeddings(pool: Creator[], semantic: string): Promise<Sear
     const reason = noteWins ? `CRM note: “${clip(notes[note].text)}”` : `Closest post: “${clip(creator.captions[post])}”`;
     return { creator, score, reason, matchedPost: noteWins ? null : post, warning: null };
   });
+  return ranked;
+}
+
+async function rankByEmbeddings(pool: Creator[], semantic: string): Promise<SearchResult[]> {
+  const ranked = await embedScores(pool, semantic);
   const best = Math.max(0, ...ranked.map((r) => r.score));
   if (best < EMBED_FLOOR) return [];
   return ranked.filter((r) => r.score >= EMBED_CUTOFF * best);
@@ -175,7 +181,7 @@ async function rankByEmbeddings(pool: Creator[], semantic: string): Promise<Sear
 /** Below this many roster matches, applicants and prospects who fit are returned as a second group. */
 export const ROSTER_MIN = 5;
 
-type Ranker = "embeddings" | "keywords" | "reach";
+type Ranker = "embeddings" | "keywords" | "hybrid" | "reach";
 
 /**
  * Keyword matches scoring below this share of the best match are dropped. Without it, a creator
@@ -188,7 +194,35 @@ type Ranker = "embeddings" | "keywords" | "reach";
  */
 const KEYWORD_CUTOFF = Number(process.env.KEYWORD_CUTOFF ?? 0.5);
 
-async function rank(pool: Creator[], semantic: string): Promise<{ ranked: SearchResult[]; ranker: Ranker }> {
+function keywordMatches(pool: Creator[], semantic: string): SearchResult[] {
+  const ranked = rankByKeywords(pool, semantic).filter((r) => r.score > 0);
+  const best = Math.max(0, ...ranked.map((r) => r.score));
+  return ranked.filter((r) => r.score >= KEYWORD_CUTOFF * best);
+}
+
+/**
+ * Hybrid: keywords decide who is eligible, embeddings decide the order.
+ *   1. No creator in the pool has any word of the topic: nobody fits, return nobody. The
+ *      embedding ranker cannot do this (see EMBED_FLOOR above).
+ *   2. Some creator has every word of the topic ("meal prep", "wedding guest outfits"): the words
+ *      are ones creators really use, so only the keyword matches are eligible, and embeddings
+ *      order them. This keeps near misses out.
+ *   3. Only partial matches ("getting better rest at night" when the posts say "sleep"): the
+ *      brief is a paraphrase and the keyword matches are guesses, so fall back to embeddings.
+ */
+async function rankHybrid(pool: Creator[], semantic: string): Promise<SearchResult[]> {
+  const kw = keywordMatches(pool, semantic);
+  if (!kw.length) return [];
+  const q = queryTokens(semantic);
+  const literal = kw.some((r) => { const toks = docTokens.get(r.creator.id)!; return q.every((t) => toks.includes(t)); });
+  if (!literal) return rankByEmbeddings(pool, semantic);
+  const emb = new Map((await embedScores(pool, semantic)).map((r) => [r.creator.id, r.score]));
+  return kw.map((r) => ({ ...r, score: emb.get(r.creator.id) ?? 0 }));
+}
+
+export type Forced = "keywords" | "embeddings" | "hybrid";
+
+async function rank(pool: Creator[], semantic: string, forced?: Forced): Promise<{ ranked: SearchResult[]; ranker: Ranker }> {
   if (!semantic.trim()) {
     // No topic: highest recent reach first.
     const ranked = pool
@@ -196,21 +230,18 @@ async function rank(pool: Creator[], semantic: string): Promise<{ ranked: Search
       .sort((a, b) => b.creator.recentReach - a.creator.recentReach);
     return { ranked, ranker: "reach" };
   }
+  const want = forced ?? (process.env.RANKER as Forced | undefined) ?? "hybrid";
   let ranked: SearchResult[] | null = null;
   let ranker: Ranker = "keywords";
-  if (embeddingsReady() && process.env.RANKER !== "keywords") {
+  if (embeddingsReady() && want !== "keywords") {
     try {
-      ranked = await rankByEmbeddings(pool, semantic);
-      ranker = "embeddings";
+      ranked = want === "hybrid" ? await rankHybrid(pool, semantic) : await rankByEmbeddings(pool, semantic);
+      ranker = want === "hybrid" ? "hybrid" : "embeddings";
     } catch (e) {
       console.warn("embedding ranker failed, using keywords:", e);
     }
   }
-  if (!ranked) {
-    ranked = rankByKeywords(pool, semantic).filter((r) => r.score > 0);
-    const best = Math.max(0, ...ranked.map((r) => r.score));
-    ranked = ranked.filter((r) => r.score >= KEYWORD_CUTOFF * best);
-  }
+  if (!ranked) ranked = keywordMatches(pool, semantic);
   for (const r of ranked) {
     r.warning = conflictFor(r.creator, semantic);
     // A creator who cannot take the brief should not outrank one who can.
@@ -220,14 +251,14 @@ async function rank(pool: Creator[], semantic: string): Promise<{ ranked: Search
   return { ranked, ranker };
 }
 
-export async function search(q: ParsedQuery): Promise<{ results: SearchResult[]; offRoster: SearchResult[]; ranker: Ranker }> {
+export async function search(q: ParsedQuery, forced?: Forced): Promise<{ results: SearchResult[]; offRoster: SearchResult[]; ranker: Ranker }> {
   if (q.stages.length) {
     // Filter by stage before ranking, so the relevance cutoff is measured against the best
     // match the user could actually see, not against someone in a stage they excluded.
-    const { ranked, ranker } = await rank(applyFilters(q).filter((c) => q.stages.includes(c.stage)), q.semantic);
+    const { ranked, ranker } = await rank(applyFilters(q).filter((c) => q.stages.includes(c.stage)), q.semantic, forced);
     return { results: ranked, offRoster: [], ranker };
   }
-  const { ranked, ranker } = await rank(applyFilters(q), q.semantic);
+  const { ranked, ranker } = await rank(applyFilters(q), q.semantic, forced);
 
   // Browsing (no topic to match): everyone in one list, whatever their stage.
   if (!q.semantic.trim()) return { results: ranked, offRoster: [], ranker };

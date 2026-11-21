@@ -88,7 +88,7 @@ export type SearchResult = {
 export type SearchResponse = {
   parsed: ParsedQuery;
   parser: "llm" | "rules" | "chips";
-  ranker: "embeddings" | "keywords" | "reach";
+  ranker: "embeddings" | "keywords" | "hybrid" | "reach";
   results: SearchResult[];
   /** Applicants and prospects who fit, sent only when fewer than five roster creators do. */
   offRoster: SearchResult[];
