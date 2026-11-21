@@ -85,6 +85,22 @@ the cutoffs were chosen and every known miss.
     npm run eval                                   # app must be running
     npm run eval -- --url http://localhost:3210    # if it is on another port
 
+## From a whole brief to a shortlist
+
+Paste a brand's brief instead of typing one line. A model reads it (who they
+want, how many, the total budget, "nobody with a competing deal"), and every
+number it returns has to be written in the brief or it is dropped. Then code,
+not a model, builds the shortlist from the search results: exact fits first,
+then creators who meet the brief but have no post about the product, each
+marked; nobody with a conflict note about the product; the total inside the
+budget. The panel shows how the brief was read, the picks with rates, who was
+left out and why, and gives the reply to send.
+
+`npm run eval:briefs` scores twelve briefs. On the six held back, the first
+run read 95 of 96 fields and 4 of 6 shortlists passed every check; after
+three fixes all twelve pass, so there is no held-out brief left.
+[docs/EVAL.md](docs/EVAL.md), "Brief to shortlist", has what each run found.
+
 ## The language-model parts
 
     OPENAI_API_KEY=... npm run embed    # rewrites data/embeddings.json after a reseed

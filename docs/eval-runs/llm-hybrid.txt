@@ -51,8 +51,7 @@ pass         -      -  yoga teachers with over 80k followers
 FAIL         -      -  makeup tutorials from creators in Chicago   [nobody fits, nobody returned]
                        parsed: {"niches": ["beauty"], "locations": ["Chicago"], "semantic": "makeup tutorials"}
 pass      0.80   0.80  anyone under 20k who posts thrift hauls   [5 expected, 5 returned]
-FAIL         -      -  roster talent in Texas with 60% or more of their audience in the US
-                       parsed: {"locations": ["TX"], "stages": ["roster"], "minAudienceUS": 50, "semantic": "60"}
+pass         -      -  roster talent in Texas with 60% or more of their audience in the US
 pass      1.00   1.00  creaters in Calfornia who post about meal prep   [1 expected, 1 returned]
 pass         -      -  top beauty and haircare creators, half a million and up
 pass      0.50   1.00  prospects who review protein powder   [2 expected, 4 returned]
@@ -74,6 +73,6 @@ pass         -      -  skincare creators, total budget $20,000
 pass      1.00   1.00  Women in their twenties with a mostly US audience for a lip oil launch   [3 expected, 3 returned]
 
 parser=llm ranker=hybrid; parser=llm ranker=none (no topic)
-all: filters 67/70, mean P@5 0.97 and mean recall 0.86 over 36 topic queries, nobody-fits 5/5
+all: filters 68/70, mean P@5 0.97 and mean recall 0.86 over 36 topic queries, nobody-fits 5/5
 tuned on: filters 60/60, mean P@5 0.99 and mean recall 0.84 over 31 topic queries, nobody-fits 4/4
-held out: filters 7/10, mean P@5 0.82 and mean recall 0.96 over 5 topic queries, nobody-fits 1/1
+held out: filters 8/10, mean P@5 0.82 and mean recall 0.96 over 5 topic queries, nobody-fits 1/1

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import creatorsJson from "../../data/creators.json";
 import { closest } from "./fuzzy";
-import { Creator, ParsedQuery, SearchResult } from "./types";
+import { Creator, ParsedQuery, PlanPick, SearchResult } from "./types";
 
 export const creators = creatorsJson as Creator[];
 
@@ -82,7 +82,8 @@ function rankByKeywords(pool: Creator[], semantic: string): SearchResult[] {
     const reason = noteWins ? `CRM note: “${clip(notes[0].text)}”`
       : posts.length ? `${posts.length} of ${creator.captions.length} recent posts match: “${clip(posts[0].cap)}”`
       : null;
-    return { creator, score, reason, matchedPost: posts.length ? posts[0].i : null, warning: null };
+    const partial = Math.max(posts[0]?.hits ?? 0, notes[0]?.hits ?? 0) < q.length;
+    return { creator, score, reason, matchedPost: posts.length ? posts[0].i : null, warning: null, partial };
   });
 }
 
@@ -181,7 +182,7 @@ async function rankByEmbeddings(pool: Creator[], semantic: string): Promise<Sear
 /** Below this many roster matches, applicants and prospects who fit are returned as a second group. */
 export const ROSTER_MIN = 5;
 
-type Ranker = "embeddings" | "keywords" | "hybrid" | "judge" | "smart" | "reach";
+type Ranker = "embeddings" | "keywords" | "hybrid" | "reach";
 
 /**
  * Keyword matches scoring below this share of the best match are dropped. Without it, a creator
@@ -220,76 +221,7 @@ async function rankHybrid(pool: Creator[], semantic: string): Promise<SearchResu
   return kw.map((r) => ({ ...r, score: emb.get(r.creator.id) ?? 0 }));
 }
 
-// ------------------------------------------------------------ LLM judge
-
-/** Every distinct post and searchable note in the database. The judge reads these, not creators. */
-const TEXTS = [...new Set(creators.flatMap((c) => [...c.captions, ...searchableNotes(c).map((n) => n.text)]))].sort();
-
-const JUDGE_SYSTEM = `You match a topic from a brand's casting brief against creators' posts and CRM notes.
-You get the topic and a numbered list of texts. Return the numbers of every text that is about the topic: a person reading the text would agree it shows the creator posts about, or does, what the topic asks for, even when the words differ ("rest" and "sleep").
-A text that only shares a word with the topic, or is only in the same broad category, does not match.
-If no text matches, return an empty list. Reply with JSON only: {"match":[numbers]}`;
-
-const judged = new Map<string, Set<string>>();
-
-/** Which posts and notes are about the topic, decided by the model. One call per new topic. */
-async function judgeTopic(semantic: string): Promise<Set<string>> {
-  const key = semantic.trim().toLowerCase();
-  const hit = judged.get(key);
-  if (hit) return hit;
-  const model = process.env.JUDGE_MODEL ?? "gpt-4o-mini";
-  const base = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1";
-  const res = await fetch(`${base}/chat/completions`, {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-    body: JSON.stringify({
-      model,
-      response_format: { type: "json_object" },
-      ...(model.startsWith("gpt-4") ? { temperature: 0 } : { reasoning_effort: "low" }),
-      messages: [
-        { role: "system", content: JUDGE_SYSTEM },
-        { role: "user", content: `Topic: ${semantic}\n\nTexts:\n${TEXTS.map((t, i) => `${i}. ${t}`).join("\n")}` },
-      ],
-    }),
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!res.ok) throw new Error(`judge HTTP ${res.status}`);
-  const raw = JSON.parse((await res.json()).choices[0].message.content);
-  // Only numbers that point at a real text survive; anything else the model wrote is ignored.
-  const out = new Set<string>((Array.isArray(raw.match) ? raw.match : []).filter((i: unknown) => Number.isInteger(i) && TEXTS[i as number]).map((i: number) => TEXTS[i]));
-  judged.set(key, out);
-  return out;
-}
-
-async function rankByJudge(pool: Creator[], semantic: string): Promise<SearchResult[]> {
-  const match = await judgeTopic(semantic);
-  return pool.flatMap((creator) => {
-    const posts = creator.captions.map((cap, i) => ({ i, cap })).filter((p) => match.has(p.cap));
-    const notes = searchableNotes(creator).filter((n) => match.has(n.text));
-    if (!posts.length && !notes.length) return [];
-    const reason = posts.length ? `${posts.length} of ${creator.captions.length} recent posts match: “${clip(posts[0].cap)}”` : `CRM note: “${clip(notes[0].text)}”`;
-    return [{ creator, score: posts.length + 0.5 * notes.length, reason, matchedPost: posts.length ? posts[0].i : null, warning: null }];
-  });
-}
-
-/**
- * Keywords first, the judge when keywords cannot cover the topic.
- *   Some creator has every word of the topic: the brief uses words creators use, and the keyword
- *   matches are the answer. No model call.
- *   Otherwise the brief is a paraphrase, or about something nobody posts: the model reads the
- *   distinct posts and notes and says which are about the topic. It can say none.
- */
-async function rankSmart(pool: Creator[], semantic: string): Promise<SearchResult[]> {
-  const kw = keywordMatches(pool, semantic);
-  const q = queryTokens(semantic);
-  const literal = kw.some((r) => { const toks = docTokens.get(r.creator.id)!; return q.every((t) => toks.includes(t)); });
-  if (!literal) return rankByJudge(pool, semantic);
-  if (process.env.SMART_ORDER !== "embeddings" || !loadEmbeddings()) return kw;
-  const emb = new Map((await embedScores(pool, semantic)).map((r) => [r.creator.id, r.score]));
-  return kw.map((r) => ({ ...r, score: emb.get(r.creator.id) ?? 0 }));
-}
-
-export type Forced = "keywords" | "embeddings" | "hybrid" | "judge" | "smart";
+export type Forced = "keywords" | "embeddings" | "hybrid";
 
 async function rank(pool: Creator[], semantic: string, forced?: Forced): Promise<{ ranked: SearchResult[]; ranker: Ranker }> {
   if (!semantic.trim()) {
@@ -302,13 +234,10 @@ async function rank(pool: Creator[], semantic: string, forced?: Forced): Promise
   const want = forced ?? (process.env.RANKER as Forced | undefined) ?? "hybrid";
   let ranked: SearchResult[] | null = null;
   let ranker: Ranker = "keywords";
-  if (process.env.OPENAI_API_KEY && want !== "keywords" && (embeddingsReady() || want === "judge" || want === "smart")) {
+  if (embeddingsReady() && want !== "keywords") {
     try {
-      ranked = want === "hybrid" ? await rankHybrid(pool, semantic)
-        : want === "judge" ? await rankByJudge(pool, semantic)
-        : want === "smart" ? await rankSmart(pool, semantic)
-        : await rankByEmbeddings(pool, semantic);
-      ranker = want;
+      ranked = want === "hybrid" ? await rankHybrid(pool, semantic) : await rankByEmbeddings(pool, semantic);
+      ranker = want === "hybrid" ? "hybrid" : "embeddings";
     } catch (e) {
       console.warn("embedding ranker failed, using keywords:", e);
     }
@@ -337,6 +266,58 @@ export async function search(q: ParsedQuery, forced?: Forced): Promise<{ results
 
   // A brief with a topic: roster first. Only when the roster is thin do we show who would be worth signing.
   const results = ranked.filter((r) => r.creator.stage === "roster");
-  const offRoster = results.length < ROSTER_MIN ? ranked.filter((r) => r.creator.stage !== "roster") : [];
+  // A brief that asks for more than five needs the others shown sooner.
+  const offRoster = results.length < Math.max(ROSTER_MIN, q.brief?.count ?? 0) ? ranked.filter((r) => r.creator.stage !== "roster") : [];
   return { results, offRoster, ranker };
+}
+
+const short = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M` : `${Math.round(n / 1000)}K`);
+
+/**
+ * For a shortlist that the exact matches cannot fill. Everyone returned meets the brief's hard
+ * requirements (creator type, place, gender, age, audience, rate); what differs is how strong
+ * the fit is. Best first:
+ *   1. posts about the topic, and is just outside a follower range the brief gave as a
+ *      preference (down to half the minimum, up to double the maximum)
+ *   2. meets every requirement, and has a post with some of the topic's words
+ *   3. meets every requirement, but has no recent post about the topic
+ *   4. outside the range and no post
+ * A range the brief states flatly is never stretched. Each creator comes with a sentence saying
+ * what is weaker about them. `have` is who the search already returned.
+ */
+export async function widen(q: ParsedQuery, have: Set<string>): Promise<PlanPick[]> {
+  const topic = q.semantic.trim();
+  const stretch = !!q.brief?.flexibleSize && (q.minFollowers != null || q.maxFollowers != null);
+  if (!topic && !stretch) return [];
+  const inStage = (c: Creator) => (q.stages.length ? q.stages.includes(c.stage) : c.stage === "roster");
+  const strict = applyFilters(q).filter(inStage);
+  const inRange = new Set(strict.map((c) => c.id));
+  const near = !stretch ? [] : applyFilters({
+    ...q, minFollowers: q.minFollowers != null ? q.minFollowers / 2 : null, maxFollowers: q.maxFollowers != null ? q.maxFollowers * 2 : null,
+  }).filter((c) => inStage(c) && !inRange.has(c.id));
+  const size = (c: Creator) => `${short(c.followers)} followers, just outside the range the brief prefers`;
+  const silent = `no recent post about ${topic}`;
+
+  const out: PlanPick[] = [];
+  const seen = new Set(have);
+  const add = (r: SearchResult, note: string, outside: boolean) => {
+    if (seen.has(r.creator.id)) return;
+    seen.add(r.creator.id);
+    out.push({ ...r, warning: topic ? conflictFor(r.creator, topic) : null, note, outside });
+  };
+  if (topic && near.length) for (const r of (await rank(near, topic)).ranked) add(r, size(r.creator), true);
+  const byReach = (list: Creator[]) => [...list].sort((a, b) => b.recentReach - a.recentReach)
+    .map((creator) => ({ creator, score: 0, reason: null, matchedPost: null, warning: null }));
+  // Before calling anyone silent, look for a post with some of the topic's words. The search can
+  // miss these: for "skin tint foundation" the embedding ranker preferred a "clean girl makeup"
+  // post and cut off the creators with a "Foundation wear test".
+  if (topic) {
+    const left = strict.filter((c) => !seen.has(c.id));
+    for (const r of rankByKeywords(left, topic).filter((x) => x.score > 0 && x.reason).sort((a, b) => b.score - a.score || b.creator.recentReach - a.creator.recentReach)) {
+      add({ ...r, partial: true }, `the post covers only part of "${topic}"`, false);
+    }
+    for (const r of byReach(strict)) add(r, silent, false);
+  }
+  for (const r of byReach(near)) add(r, topic ? `${size(r.creator)}; ${silent}` : size(r.creator), true);
+  return out;
 }

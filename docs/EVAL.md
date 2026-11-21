@@ -390,3 +390,157 @@ What the hybrid still gets wrong:
 - Recall is still low where the right answer is large and the wording
   loose: "who talks about caffeine before the gym" and "something to drink
   before lifting" return 5 of 17.
+
+## Addendum: other models, a simpler ranker, and what the labels can measure (20 Nov 2026, late)
+
+The question was how much closer to perfect the search could get. Three things
+were tried, all on 178 creators and the same 70 briefs.
+
+**An LLM judge in place of the rankers.** One prompt: the model gets the topic
+and the 153 distinct posts and searchable notes, and returns the ones that
+are about the topic. Creators with a matching post are the answer. Scored by
+`scripts/experiments/judge.py` with the eval's own ground truth, topics from
+the LLM parser:
+
+| Judge model | Tuned P@5 | Tuned recall | Tuned nobody-fits | Held-out P@5 | Held-out recall | Median time |
+| --- | --- | --- | --- | --- | --- | --- |
+| gpt-4o-mini | 0.93 | 0.91 | 4/4 | 0.82 | 0.89 | 0.5 s |
+| gpt-4.1-mini | 0.92 | 0.93 | 4/4 | 0.68 | 0.69 | 0.5 s |
+| gpt-5.4-nano | 0.94 | 0.91 | 4/4 | 0.63 | 0.80 | 0.9 s |
+| gpt-5.4-mini | 0.95 | 0.91 | 4/4 | 0.80 | 0.80 | 1.3 s |
+| gpt-6-luna | 0.96 | 0.94 | 4/4 | 0.72 | 0.69 | 0.9 s |
+| LLM + hybrid, for comparison | 0.99 | 0.84 | 4/4 | 0.82 | 0.96 | |
+
+A Claude model was also tried; the script failed on the response format and
+it was not scored. Inside the app (commit 5e206e6, removed afterwards), the
+judge alone scored tuned P@5 0.92 and recall 0.89 with the rule parser, and
+"keywords first, the judge when no creator has every word of the topic"
+scored 0.95 and 0.85 with the rule parser and 0.97 and 0.87 with the LLM
+parser (held out 0.77 and 0.85). Runs are in `eval-runs/rules-judge.txt`,
+`rules-smart.txt` and `llm-smart.txt`.
+
+So five models and two more architectures all land between 0.92 and 0.99 on
+tuned precision, with the judge about 0.07 higher on recall and lower on
+precision. Held-out moves between 0.63 and 0.89 on five briefs. Nothing here
+is a clear win over the hybrid, and the hybrid was kept.
+
+**The labels are the ceiling.** `scripts/experiments/judge_detail.py` lists
+every post where the judge and the labels disagree. A label is "a caption
+contains one of these strings", and reading the disagreements shows where
+that breaks:
+
+- Label errors: for "fitness creators who post about running" the term is
+  "run", which also matches "brunette", "crunchy" and "farmers market run".
+- Labels too narrow: "makeup tutorials" counts only captions with the word
+  "makeup"; the judge also returned soft glam, foundation and winged liner
+  posts. "Open to paid usage" does not count "Open to whitelisting for a
+  usage fee".
+- Real judge errors: "Bridal hair trial" for wedding guest outfits, "Marathon
+  training week nine" for running shoes, "protective styles for a beach
+  holiday" for sunburn.
+
+The hybrid's 0.99 is partly agreement by construction: its gate is a keyword
+match and so are the labels. Past about 0.95 this eval is measuring agreement
+with a substring rule, not correctness. Getting closer to perfect means
+hand-labelled relevance per topic and post, not another ranker.
+
+**A stronger model for the one-line parser.** Filters read correctly, tuned
+and held out (before the percentage fix below): gpt-4o-mini 60/60 and 7/10
+(median 1.0 s), gpt-4.1-mini 58/60 and 6/10, gpt-5.4-mini 60/60 and 7/10,
+gpt-6-luna 60/60 and 9/10 (1.4 s). gpt-6-luna reads "sneakerheads" as
+streetwear and does not add a beauty filter to "makeup tutorials". It was
+not switched in: every demo count was checked with gpt-4o-mini.
+
+All four models read "60% or more of their audience in the US" as 60. The
+rule parser then overwrote it with its default of 50. The cross-check now
+keeps a percentage from the model when that percentage is written in the
+brief and the rules' figure is not. This was a held-out case, so it no longer
+counts as one: LLM + hybrid now reads 8 of 10 held-out briefs (tuned P@5
+0.99, recall 0.84; held out 0.82 and 0.96, unchanged). Rules + keywords is
+unchanged, line for line.
+
+## Brief to shortlist (20 Nov 2026, late)
+
+The conclusion from the section above was that the search was near what its
+eval can measure, and that the gaps left were not ranking gaps: a head count,
+a total budget, "nobody with a competing deal", and briefs that arrive as an
+email. So the model now reads the whole brief, and code builds the shortlist:
+
+1. **Read** (`readBrief` in `src/lib/parse.ts`, gpt-4.1): the same filters as
+   before, plus brand, product, head count, total budget, deliverable,
+   deadline, "no conflicts", and whether the follower range was hedged. Every
+   number returned must be traceable to the text of the brief; one that is
+   not is dropped and shown as not used.
+2. **Search**: unchanged.
+3. **Pick** (`buildPlan` in `src/lib/plan.ts`, no model): exact matches in
+   search order, then creators who meet every requirement but have no post
+   about the product, each marked. A hedged follower range may stretch to
+   half its minimum and double its maximum; a flat one never does. Only
+   creators with an agreed rate are picked. A conflict note about the product
+   excludes a creator and is quoted. With a total budget, the list is as long
+   as the budget allows and stays inside it.
+
+`scripts/eval_briefs.py` scores twelve briefs written to look like what a
+brand sends (email, bullet list, forwarded note, one-paragraph ask), with
+distractor numbers such as "SPF 50", "$38" and "24 shades". Reading is 16
+fields per brief. A plan passes when it clears seven checks computed from the
+data file and the expected reading: priced, hard requirements met, no
+conflict, money adds up inside the budget, as long as it can be, exact fits
+included, weaker picks marked.
+
+| Run | Fields read | Briefs read with no mistake | Plans passing every check |
+| --- | --- | --- | --- |
+| Six development briefs, first run, gpt-4o-mini | 91/96 | 2/6 | 2/6 |
+| Six development briefs, final code, gpt-4.1 | 96/96 | 6/6 | 6/6 |
+| Six held-out briefs, first run, gpt-4.1 | 95/96 | 5/6 | 4/6 |
+| Six held-out briefs after three fixes (no longer held out) | 96/96 | 6/6 | 6/6 |
+
+Runs: `eval-runs/briefs-first-full-run.txt` and `briefs-after-fixes.txt`. On
+the final code all twelve pass, which means there is no held-out brief left:
+the next honest number needs new briefs.
+
+What the first development run found, with gpt-4o-mini reading:
+
+- "preferably 20K to 100K followers" came back with an age range of 20 to 29.
+- A brief with $10K total for 5 creators came back with a per-creator rate
+  of $2,000 that the brief never states. The figure check dropped it.
+- "8 hair or beauty creators" came back as hair only; one brief came back
+  with no topic.
+
+Reading model, same six briefs: gpt-4o-mini 92/96 fields and 3/6 briefs;
+gpt-4.1-mini 95/96 and 5/6; gpt-4.1, gpt-5.4-mini, gpt-6-luna, gpt-6-sol and
+gpt-6.2-sol all 96/96 and 6/6. gpt-4.1 was the fastest of those (median
+1.6 s) and scored 96/96 in two more runs, so it reads whole briefs.
+
+What the held-out run found:
+
+- A three-sentence brief of 140 characters was sent to the one-line parser,
+  which has no "no conflicts" field. Whole-brief reading now also applies to
+  anything with three sentences or more.
+- A $3,000 budget covered two of the creators who post about sleep, and the
+  third place was left empty although a cheaper creator who meets the brief
+  existed. The plan now always considers those creators.
+- Reading one held-out plan by hand found a wrong claim the checks had
+  passed: a creator with a "Foundation wear test" post was listed as having
+  no post about "skin tint foundation", because the embedding ranker had
+  preferred a "clean girl makeup" post and cut her off. The plan now looks
+  for a post with some of the topic's words before saying there is none, and
+  marks it as covering part of the topic.
+- "Follower range was hedged" came back true once for a brief with no
+  follower range. It changes nothing, and it shows the reading is not
+  identical from run to run. Five briefs run five times each gave the same
+  shortlist every time.
+
+Limits:
+
+- Twelve briefs, written by the same person as the code. The plan checks test
+  that constraints hold, not that a talent partner would choose the same
+  people.
+- The plan follows the search ranking and does not try to use the budget:
+  one development brief gets six creators for $9,120 of $30,000.
+- When too few creators have posted about the product, the list is filled
+  with creators who meet the brief and have not, and says so. A brief that
+  insists on proof ("who actually talk about sleep") is treated the same way.
+- A conflict is found by word overlap between the note and the topic.
+- Nothing is picked when nobody passes the hard requirements; one held-out
+  brief (streetwear in New York or Los Angeles) correctly gets an empty list.

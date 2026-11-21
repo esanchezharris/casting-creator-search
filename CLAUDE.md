@@ -43,6 +43,7 @@ three stages. It does not crawl social platforms for strangers.
     npm run seed     # regenerate data/creators.json (178 fictional creators, seed 11)
     npm run embed    # needs OPENAI_API_KEY; writes data/embeddings.json (rerun after a reseed)
     npm run eval     # needs the app running; prints parser + P@5 scores
+    npm run eval:briefs  # needs the app running and a key; scores whole briefs and their shortlists
 
 ## How it works
 - `src/lib/parse.ts`: query -> `ParsedQuery` (niches, locations, stages,
@@ -159,6 +160,27 @@ The API takes `parser: "rules"` and `ranker` per request, so
 on one server. Numbers for all six are in the last section of docs/EVAL.md
 (LLM + hybrid, tuned: P@5 0.99, recall 0.84, nobody-fits 4/4; held out 0.82,
 0.96, 1/1). Shot 5 of the demo now reads "2 on the roster, 4 not yet".
+
+Brief to shortlist (20 Nov, last of all): pasting a whole brief (over 160
+characters, several lines, or three sentences) goes to `readBrief` in
+`src/lib/parse.ts` (gpt-4.1, `BRIEF_MODEL` to change it). It returns the usual
+filters plus `brief` (brand, product, head count, total budget, deliverable,
+deadline, no conflicts, hedged follower range). Every number must be
+traceable to the text or it is dropped and shown as not used. A one-line
+brief gets a head count and a total budget from the rules. When
+`parsed.brief` is set the API returns `plan`: `buildPlan` in
+`src/lib/plan.ts` picks from the search results, then from `widen()` in
+`src/lib/search.ts` (creators who meet the brief but have no post about the
+product, each marked). No model picks anyone. `PlanPanel` shows it above the
+grid. `npm run eval:briefs` scores twelve briefs; all pass on the final code,
+so none is held out any more. First-run numbers and what each run found are
+in docs/EVAL.md, "Brief to shortlist". The demo script was rewritten around
+it (shot 5).
+
+Tried and not kept (20 Nov): an LLM judge as the ranker, and keywords-then-
+judge. Five models, all between 0.92 and 0.99 tuned P@5. The eval's labels are
+substring matches and are now the ceiling; see docs/EVAL.md. The scripts are
+in `scripts/experiments/`.
 
 Port 3000 is often taken on Emilio's machine. `npx next dev --port 3210` and
 `npm run eval -- --url http://localhost:3210` work.

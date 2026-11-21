@@ -11,12 +11,13 @@ import { cn } from "@/lib/utils";
 import { FilterChips, summarize, type FilterEdit } from "@/components/FilterChips";
 import { activeCount, FilterPanel, SORTS, type Sort } from "@/components/FilterPanel";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { PlanPanel } from "@/components/PlanPanel";
 import { QuickLook } from "@/components/QuickLook";
 import { Segmented } from "@/components/Segmented";
 import { useElastic } from "@/lib/elastic";
-import type { Creator, SearchResponse, SearchResult } from "@/lib/types";
+import type { Creator, PlanPick, SearchResponse, SearchResult } from "@/lib/types";
 
-const NO_FILTERS = { niches: [], locations: [], stages: [], genders: [], minAge: null, maxAge: null, minFollowers: null, maxFollowers: null, maxRate: null, minEngagement: null, minAudienceUS: null, semantic: "" };
+const NO_FILTERS = { niches: [], locations: [], stages: [], genders: [], minAge: null, maxAge: null, minFollowers: null, maxFollowers: null, maxRate: null, minEngagement: null, minAudienceUS: null, semantic: "", brief: null };
 const PANEL = "casting.filters.v1";
 const KEYS: [string[], string][] = [
   [["←", "→", "↑", "↓"], "Move between creators"], [["Space"], "Open or close quick look"], [["S"], "Shortlist the focused creator"],
@@ -24,7 +25,7 @@ const KEYS: [string[], string][] = [
 ];
 
 const PARSER_LABEL = { llm: "Read by the language model", rules: "Read by the rule parser", chips: "Filters edited by hand" };
-const RANKER_LABEL = { embeddings: "ranked by meaning", keywords: "ranked by keywords", hybrid: "ranked by keywords and meaning", judge: "matched by the language model", smart: "matched by keywords, then the language model", reach: "ordered by recent reach" };
+const RANKER_LABEL = { embeddings: "ranked by meaning", keywords: "ranked by keywords", hybrid: "ranked by keywords and meaning", reach: "ordered by recent reach" };
 
 const STORE = "casting.shortlist.v1";
 type Shortlist = { brief: string; creators: Creator[] };
@@ -65,6 +66,9 @@ export default function Page() {
   const [sort, setSort] = useState<Sort>("match");
   const [focus, setFocus] = useState(-1);
   const [looking, setLooking] = useState(false);
+  // A creator opened from the proposed shortlist who is not among the cards below.
+  const [peek, setPeek] = useState<SearchResult | null>(null);
+  const [typing, setTyping] = useState(false);
   const [shortlist, setShortlist] = useState<Shortlist>({ brief: "", creators: [] });
   const [restored, setRestored] = useState(false);
   // The filter panel starts open on a wide screen and closed on a narrow one, then remembers.
@@ -86,7 +90,7 @@ export default function Page() {
   const filterList = useElastic<HTMLDivElement>();
   const pageBody = useElastic<HTMLDivElement>("y", true);
 
-  const input = useRef<HTMLInputElement>(null);
+  const input = useRef<HTMLTextAreaElement>(null);
   const cards = useRef<(HTMLElement | null)[]>([]);
   const sheet = useRef<HTMLDivElement>(null);
   // The frame each card is showing, so quick look opens on the post being looked at.
@@ -104,7 +108,7 @@ export default function Page() {
       const json: SearchResponse = await res.json();
       if (id !== latest.current) return; // a newer search already answered
       asked.current = "query" in body ? body.query.trim() : summarize(json.parsed);
-      setData(json); setError(null); setFocus(-1); setLooking(false); setSort("match"); setLoading(false);
+      setData(json); setError(null); setFocus(-1); setLooking(false); setPeek(null); setSort("match"); setLoading(false);
       // A new answer starts at its first row, wherever the last one was scrolled to.
       window.scrollTo({ top: 0 });
     } catch {
@@ -148,13 +152,13 @@ export default function Page() {
       const typing = t instanceof HTMLTextAreaElement || t instanceof HTMLInputElement;
       if (e.key === "Escape") {
         if (typing) (t as HTMLElement).blur();
-        else setLooking(false);
+        else { setLooking(false); setPeek(null); }
         return;
       }
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "/") { e.preventDefault(); input.current?.focus(); input.current?.select(); return; }
       // While a search is running the cards on screen are the old answer: keys must not act on them.
-      if (!all.length || loading) return;
+      if (!all.length || loading || peek) return;
 
       const cols = sheet.current ? getComputedStyle(sheet.current).gridTemplateColumns.split(" ").length : 1;
       const step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: cols, ArrowUp: -cols }[e.key];
@@ -174,10 +178,10 @@ export default function Page() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [all, focus, toggle, loading]);
+  }, [all, focus, toggle, loading, peek]);
 
   // Quick look covers the page, so the page behind it should not scroll.
-  const lookOpen = looking && focus >= 0;
+  const lookOpen = (looking && focus >= 0) || !!peek;
   useEffect(() => {
     if (!lookOpen) return;
     document.body.style.overflow = "hidden";
@@ -193,13 +197,41 @@ export default function Page() {
     }
   };
 
+  const copyReply = async () => {
+    if (!data?.plan) return;
+    try {
+      await navigator.clipboard.writeText(data.plan.reply);
+      toast.success("Reply copied", { description: "Names, rates, the total and what was left out." });
+    } catch {
+      toast.error("Could not copy", { description: "The browser blocked the clipboard." });
+    }
+  };
+  const addPlan = () => {
+    if (!data?.plan) return;
+    const add = data.plan.picks.map((p) => p.creator);
+    setShortlist((prev) => ({ brief: asked.current, creators: [...prev.creators, ...add.filter((c) => !prev.creators.some((x) => x.id === c.id))] }));
+  };
+  // A pick that is also a card opens there, so the arrow keys carry on from it.
+  const openPick = (p: PlanPick) => {
+    const i = all.findIndex((r) => r.creator.id === p.creator.id);
+    if (i >= 0) { setFocus(i); setLooking(true); } else setPeek(p);
+  };
+
+  // The brief box is one line until it is being typed in; a pasted brief gets room while it has the cursor.
+  useEffect(() => {
+    const el = input.current;
+    if (!el) return;
+    el.style.height = "20px";
+    if (typing) el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  }, [query, typing]);
+
   // Searching hands the keyboard to the grid, so arrows and S work without a click.
   const submit = (text: string) => { input.current?.blur(); run({ query: text }); };
 
   const signed = shortlist.creators.filter((c) => c.rate != null);
   const unsigned = shortlist.creators.length - signed.length;
   const hasFilters = !!data && summarize(data.parsed) !== "";
-  const open = looking && focus >= 0 ? all[focus] : null;
+  const open = peek ?? (looking && focus >= 0 ? all[focus] : null);
   const first = !data && loading;
 
   const card = (r: SearchResult, i: number) => (
@@ -260,22 +292,24 @@ export default function Page() {
 
       <main className="min-w-0 flex-1 px-4 pb-28 sm:px-5">
         <div className="sticky top-0 z-20 -mx-4 border-b bg-background/90 px-4 backdrop-blur-md sm:-mx-5 sm:px-5">
-          <form className="flex h-12 items-center gap-2" onSubmit={(e) => { e.preventDefault(); submit(query); }}>
-            <span className="mr-1 text-[15px] font-medium tracking-[-0.01em]">Casting</span>
+          <form className="flex min-h-12 items-start gap-2 py-2" onSubmit={(e) => { e.preventDefault(); submit(query); }}>
+            <span className="mr-1 flex h-8 items-center text-[15px] font-medium tracking-[-0.01em]">Casting</span>
             {!panel && (
               <Button type="button" variant="outline" size="sm" className="press h-8 gap-1.5 bg-card px-2.5 text-[13px]" onClick={togglePanel}>
                 <SlidersHorizontal className="size-3.5" />Filters{active > 0 && <span className="text-muted-foreground tabular-nums">{active}</span>}
               </Button>
             )}
-            <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg border bg-card pr-1 pl-2.5 transition-[border-color] duration-150 focus-within:border-foreground">
-              <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <input
-                id="q" ref={input} value={query} autoFocus spellCheck={false} autoComplete="off"
-                aria-label="Describe the brief" placeholder="Describe who the brief needs, e.g. fitness creators who post about energy drinks"
-                className="h-full min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-muted-foreground/70"
+            <div className="flex min-h-8 min-w-0 flex-1 items-start gap-2 rounded-lg border bg-card py-[5px] pr-1 pl-2.5 transition-[border-color] duration-150 focus-within:border-foreground">
+              <Search className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <textarea
+                id="q" ref={input} value={query} autoFocus spellCheck={false} autoComplete="off" rows={1}
+                aria-label="Describe the brief, or paste it" placeholder="Describe who the brief needs, or paste the brand's whole brief"
+                className={cn("h-5 min-w-0 flex-1 resize-none bg-transparent text-[14px] leading-5 outline-none placeholder:text-muted-foreground/70", !typing && "overflow-hidden whitespace-nowrap")}
                 onChange={(e) => setQuery(e.target.value)}
+                onFocus={() => setTyping(true)} onBlur={() => setTyping(false)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(query); } }}
               />
-              <Button type="submit" size="sm" aria-busy={loading} className="press h-6 shrink-0 rounded-md px-2 text-[13px]">Search</Button>
+              <Button type="submit" size="sm" aria-busy={loading} className="press -my-px h-6 shrink-0 rounded-md px-2 text-[13px]">Search</Button>
             </div>
             <Popover>
               <PopoverTrigger render={<Button type="button" variant="ghost" size="icon" className="press size-8 text-muted-foreground max-sm:hidden" aria-label="Keyboard shortcuts" />}>
@@ -320,6 +354,13 @@ export default function Page() {
           </div>
         </div>
 
+        {!error && data?.plan && data.parsed.brief && (
+          <div className={cn("transition-opacity duration-150", loading && "pointer-events-none opacity-50")}>
+            <PlanPanel ask={data.parsed.brief} plan={data.plan} picked={picked} onAdd={addPlan} onCopy={copyReply} onOpen={openPick} />
+            {all.length > 0 && <h2 className="mt-5 text-[15px] font-medium">Everyone who fits exactly</h2>}
+          </div>
+        )}
+
         {error && (
           <div className="mt-12 max-w-md">
             <h2 className="text-[17px] font-medium">No answer from search</h2>
@@ -327,7 +368,7 @@ export default function Page() {
           </div>
         )}
 
-        {!error && !loading && data && all.length === 0 && (
+        {!error && !loading && data && all.length === 0 && !data.plan?.picks.length && (
           <div className="mt-12 max-w-md">
             <h2 className="text-[17px] font-medium">Nobody fits all of that</h2>
             <p className="mt-1 text-pretty text-muted-foreground">
@@ -376,10 +417,10 @@ export default function Page() {
         <QuickLook
           key={open.creator.id}
           result={open}
-          position={`${focus + 1} of ${all.length}`}
+          position={peek ? "Proposed shortlist" : `${focus + 1} of ${all.length}`}
           picked={picked.has(open.creator.id)}
           onPick={() => toggle(open.creator)}
-          onClose={() => setLooking(false)}
+          onClose={() => { setLooking(false); setPeek(null); }}
           start={frames.current.get(open.creator.id) ?? 0}
         />
       )}

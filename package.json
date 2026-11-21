@@ -8,7 +8,8 @@
     "start": "next start",
     "seed": "python3 scripts/seed.py",
     "embed": "python3 scripts/embed.py",
-    "eval": "python3 scripts/eval.py"
+    "eval": "python3 scripts/eval.py",
+    "eval:briefs": "python3 scripts/eval_briefs.py"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
