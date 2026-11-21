@@ -115,7 +115,7 @@ export function Clip({ src, active, sound }: { src: string; active: boolean; sou
           onClick={(e) => { e.stopPropagation(); setMuted((m) => !m); }}
           aria-label={muted ? "Turn sound on" : "Turn sound off"}
           aria-pressed={!muted}
-          className="press absolute right-3 bottom-5 grid size-9 cursor-pointer place-items-center rounded-full bg-black/30 text-white backdrop-blur-md hover:bg-black/45"
+          className="press absolute right-3 bottom-3 grid size-9 cursor-pointer place-items-center rounded-full bg-black/30 text-white backdrop-blur-md hover:bg-black/45"
         >
           {muted ? <VolumeX className="size-[18px]" /> : <Volume2 className="size-[18px]" />}
         </button>

@@ -13,6 +13,7 @@ export type Creator = {
   name: string;
   handle: string;
   gender: Gender;
+  age: number;
   /** Where the creator sits in the pipeline. Only roster creators have a partner, campaigns and a rate. */
   stage: Stage;
   partner: string | null;
@@ -61,6 +62,9 @@ export type ParsedQuery = {
   stages: Stage[];
   /** Empty means anyone. */
   genders: Gender[];
+  /** The creator's own age in years, both ends included. */
+  minAge: number | null;
+  maxAge: number | null;
   minFollowers: number | null;
   maxFollowers: number | null;
   minEngagement: number | null;

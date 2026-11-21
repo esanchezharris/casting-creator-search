@@ -46,6 +46,10 @@ def main() -> None:
         if numbers and (folder / "clip.mp4").exists():
             c["video"] = f"/creators/{c['id']}/clip.mp4"
             c["videoAt"] = numbers.index(CLIP_PHOTO.get(c["id"], 1))
+            # The still for a clip is the clip's own first frame (clip.jpg, cut with ffmpeg),
+            # so the thumbnail and the video are the same picture.
+            if (folder / "clip.jpg").exists():
+                c["images"][c["videoAt"]] = f"/creators/{c['id']}/clip.jpg"
             with_clips += 1
     DATA.write_text(json.dumps(creators, indent=1, ensure_ascii=False) + "\n")
     print(f"{with_photos} of {len(creators)} creators have photos, {with_clips} have a clip")

@@ -46,7 +46,7 @@ three stages. It does not crawl social platforms for strangers.
 
 ## How it works
 - `src/lib/parse.ts`: query -> `ParsedQuery` (niches, locations, stages,
-  follower range, min engagement, min US audience, free-text `semantic`). Two parsers: deterministic
+  gender, age range, follower range, min engagement, min US audience, free-text `semantic`). Two parsers: deterministic
   rules (always available) and an LLM call with JSON output. LLM output goes
   through `sanitize()` and falls back to rules on any error.
 - `src/lib/search.ts`: hard filters, then ranking. Keyword ranking (idf with a
@@ -108,8 +108,16 @@ six extra posts and photos (`EXTRA_POSTS` in `scripts/seed.py`, photos 6 to
 11 prompted by hand). After a reseed run `apply_media.py` and `npm run embed`.
 
 Cards preview the newest five posts only and keep the frame last looked at;
-a click opens quick look on that post. Clip stills are the photo the clip was
-made from, a re-render of the same scene, so small details can differ.
+a click opens quick look on that post. Clip stills are the clip's own first frame
+(`clip.jpg`, cut with ffmpeg; rerun `apply_media.py` after adding a clip).
+In quick look the big photo does not follow the mouse; thumbnails and `,` `.`
+change it.
+
+Age (20 Nov, last): each creator has `age`, drawn in `seed.py` from the same
+stream `media_prompts.py` uses, so it matches the photos. Age in a brief is
+read by the rules only ("over 30" is 31 and up; "over 30K" stays followers),
+and when the rules read an age and no follower figure, a follower bound from
+the model is dropped.
 
 Scrolling: `src/lib/elastic.ts` gives the filter list, the page, the quick
 look column and the thumbnail strip the same small pull-and-settle at their

@@ -21,7 +21,7 @@ export const SORTS: [Sort, string][] = [
 /** How many filters are set, for the badge on the button that reopens the panel. */
 export const activeCount = (q: ParsedQuery) =>
   q.niches.length + q.locations.length + q.stages.length + q.genders.length
-  + [q.minFollowers ?? q.maxFollowers, q.minEngagement, q.minAudienceUS, q.semantic || null].filter((v) => v != null).length;
+  + [q.minAge ?? q.maxAge, q.minFollowers ?? q.maxFollowers, q.minEngagement, q.minAudienceUS, q.semantic || null].filter((v) => v != null).length;
 
 // The follower slider is logarithmic, because the roster runs from a few thousand to about a
 // million and the interesting differences are at the small end. Either end stop means "no limit".
@@ -33,6 +33,10 @@ const toFollowers = (t: number) => {
 };
 const toStop = (v: number | null, fallback: number) =>
   v == null ? fallback : Math.max(0, Math.min(F_STEPS, Math.round((Math.log(v / F_MIN) / Math.log(F_MAX / F_MIN)) * F_STEPS)));
+
+// The age slider's end stops mean "no limit", like the follower slider's.
+const A_MIN = 18, A_MAX = 45;
+const parseAge = (t: string) => { const n = parseInt(t, 10); return isFinite(n) && n > 0 ? Math.max(16, Math.min(80, n)) : null; };
 
 function Section({ title, value, children }: { title: string; value?: string; children: React.ReactNode }) {
   return (
@@ -131,6 +135,12 @@ export function FilterPanel({ parsed: q, places, facets, onChange }: Props) {
   const followerText = lo == null && hi == null ? "Any"
     : lo != null && hi != null ? `${compact(lo)} to ${compact(hi)}` : lo != null ? `${compact(lo)} or more` : `Up to ${compact(hi!)}`;
 
+  const [ages, setAges] = useState([q.minAge ?? A_MIN, q.maxAge ?? A_MAX]);
+  useEffect(() => setAges([q.minAge ?? A_MIN, q.maxAge ?? A_MAX]), [q.minAge, q.maxAge]);
+  const young = ages[0] <= A_MIN ? null : ages[0], old = ages[1] >= A_MAX ? null : ages[1];
+  const ageLabel = young == null && old == null ? "Any"
+    : young != null && old != null ? `${young} to ${old}` : young != null ? `${young} or over` : `${old} or under`;
+
   const pill = "press h-7 rounded-md border bg-card px-2 text-[13px] hover:border-foreground";
 
   return (
@@ -152,6 +162,22 @@ export function FilterPanel({ parsed: q, places, facets, onChange }: Props) {
         {GENDERS.map((g) => (
           <Option key={g} label={GENDER_NAME[g]} count={facets[`gender:${g}`]} checked={q.genders.includes(g)} onToggle={() => onChange({ ...q, genders: toggle(q.genders, g) })} />
         ))}
+      </Section>
+
+      <Section title="Age" value={ageLabel}>
+        <Slider
+          labels={["Youngest", "Oldest"]} min={A_MIN} max={A_MAX} step={1} value={ages}
+          onValueChange={(v) => setAges(v as number[])}
+          onValueCommitted={(v) => {
+            const [a, b] = v as number[];
+            onChange({ ...q, minAge: a <= A_MIN ? null : a, maxAge: b >= A_MAX ? null : b });
+          }}
+        />
+        <div className="mt-2.5 grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-[13px] text-muted-foreground">
+          <Typed label="Age from" placeholder="Min" inputMode="numeric" value={q.minAge != null ? String(q.minAge) : ""} onCommit={(t) => onChange({ ...q, minAge: parseAge(t) })} />
+          to
+          <Typed label="Age to" placeholder="Max" inputMode="numeric" value={q.maxAge != null ? String(q.maxAge) : ""} onCommit={(t) => onChange({ ...q, maxAge: parseAge(t) })} />
+        </div>
       </Section>
 
       <Section title="Followers" value={followerText}>

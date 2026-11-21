@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Heart, Play, Plus, X } from "lucide-react";
 import {
-  Clip, compact, Facts, FRAME_COUNT, Frames, initials, nichesOf, placeOf, StageBadge, Ticks, useScrub, Warning,
+  Clip, compact, Facts, FRAME_COUNT, Frames, initials, nichesOf, placeOf, StageBadge, useScrub, Warning,
 } from "@/components/CreatorCard";
 import { Segmented } from "@/components/Segmented";
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,8 @@ type Props = {
 export function QuickLook({ result, position, picked, onPick, onClose, start }: Props) {
   const { creator, reason, warning, matchedPost } = result;
   const count = creator.images.length || FRAME_COUNT;
-  const { index, setIndex, bind } = useScrub(count, true, start);
+  // The big photo does not follow the mouse here; the thumbnails and the , and . keys change it.
+  const { index, setIndex } = useScrub(count, true, start);
   const [sort, setSort] = useState<PostSort>("recent");
 
   const postOf = (photo: number) => creator.photoPosts?.[photo] ?? Math.min(photo, creator.captions.length - 1);
@@ -101,10 +102,9 @@ export function QuickLook({ result, position, picked, onPick, onClose, start }: 
       >
         {/* Media: the frame takes its width from the dialog's height, so the photo is never cropped or letterboxed. */}
         <div className="flex shrink-0 flex-col gap-2 bg-secondary p-3 md:h-full">
-          <div className="frame w-full md:h-[calc(var(--h)-136px)] md:w-auto" {...bind}>
+          <div className="frame w-full cursor-default! md:h-[calc(var(--h)-136px)] md:w-auto">
             <Frames creator={creator} index={index} loadAll order={order} />
             {creator.video && <Clip src={creator.video} active={index === clipAt} sound />}
-            <Ticks count={count} index={index} show />
           </div>
 
           <div className="flex h-7 items-center justify-between gap-3 pl-1">
@@ -175,7 +175,7 @@ export function QuickLook({ result, position, picked, onPick, onClose, start }: 
 
                 <Facts creator={creator} className="mt-5 border-y py-4" />
                 <p className="mt-3 text-[13px] text-muted-foreground">
-                  {compact(creator.followers)} followers · largest audience market: {creator.audience.top}
+                  Age {creator.age} · {compact(creator.followers)} followers · largest audience market: {creator.audience.top}
                   {" · "}
                   {creator.partner
                     ? `talent partner ${creator.partner}, ${creator.campaigns} ${creator.campaigns === 1 ? "campaign" : "campaigns"} completed`

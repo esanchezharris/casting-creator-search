@@ -5,7 +5,7 @@ import { Creator, GENDERS, LocationFilter, NICHES, ParsedQuery, Stage, STAGES } 
 const creators = creatorsJson as Creator[];
 
 export const emptyQuery = (): ParsedQuery => ({
-  niches: [], locations: [], stages: [], genders: [], minFollowers: null, maxFollowers: null,
+  niches: [], locations: [], stages: [], genders: [], minAge: null, maxAge: null, minFollowers: null, maxFollowers: null,
   minEngagement: null, minAudienceUS: null, semantic: "",
 });
 
@@ -108,7 +108,8 @@ const FILLER = new Set(("a an the and or of in on at to for from with who whos t
   "creator creators influencer influencers people person someone anyone accounts account talent find show me give " +
   "do does doing did post posts posting posted talk talks talking about content make makes making mention mentions " +
   "followers follower following audience has have having their them they i want need looking some any " +
-  "whose us we our show list get please brief campaign launch yet already currently").split(" "));
+  "whose us we our show list get please brief campaign launch yet already currently " +
+  "age aged ages old older younger years year").split(" "));
 
 const NUM = String.raw`(\d+(?:[.,]\d+)?)\s*((?:thousand|million|k|m)(?![a-z]))?`;
 
@@ -144,6 +145,47 @@ export function parseWithRules(query: string): ParsedQuery {
   // Gender, only from plain words. "Women's running shoes" is a topic, so a possessive is left alone.
   take(/(?<![a-z])(?:women|woman|females?|ladies|girls)(?![a-z'’])/, () => { out.genders.push("woman"); });
   take(/(?<![a-z])(?:men|man|males?|guys)(?![a-z'’])/, () => { out.genders.push("man"); });
+
+  // Age, before every other number. A bare two-digit number after "over" or "under" is an age
+  // ("over 30"); with K, M, % or "followers" after it, it is left for the rules below ("over 30K").
+  {
+    const UNITS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9 };
+    const tens = Object.keys(TENS).join("|"), units = Object.keys(UNITS).join("|");
+    const NOT_A_COUNT = String.raw`(?![\d.,]*\d|\s*(?:%|percent|k(?![a-z])|m(?![a-z])|thousand|million|followers|posts|campaigns))`;
+    rest = rest
+      .replace(/(?<![a-z])(twen|thir|for|fif)ties(?![a-z])/g, (_, t) => `${{ twen: 20, thir: 30, for: 40, fif: 50 }[t as "twen"]}s`)
+      .replace(new RegExp(String.raw`((?:over|under|above|below|than|least|most|aged?|ages|turned)\s+)(${tens})(?:[- ](${units}))?(?![a-z])${NOT_A_COUNT}`, "g"),
+        (_, lead, t, u) => `${lead}${TENS[t] + (u ? UNITS[u] : 0)}`);
+    // "thirty-two" reaches here as "30-two": the tens were already turned into digits above.
+    rest = rest.replace(new RegExp(String.raw`((?:over|under|above|below|than|least|most|aged?|ages|turned)\s+)([2-7]0)[- ](${units})(?![a-z])`, "g"),
+      (_, lead, t, u) => `${lead}${parseInt(t) + UNITS[u]}`);
+    const ok = (n: number) => n >= 16 && n <= 80;
+    const YEARS = String.raw`(?:\s*(?:years?|yrs?)(?:[- ]olds?)?|\s*y\/?o)`;
+    const set = (lo: number | null, hi: number | null) => { out.minAge = lo; out.maxAge = hi; };
+    // "in their 20s", "late twenties", "30-somethings"
+    take(/(?:in\s+(?:their|his|her)\s+)?(?:(early|mid|late)[- ]?)?(?<![\d.])([2-6]0)(?:'?s|[- ]?somethings?)(?![a-z0-9])/, (m) => {
+      const d = parseInt(m[2]);
+      if (m[1] === "early") set(d, d + 3); else if (m[1] === "mid") set(d + 3, d + 6); else if (m[1] === "late") set(d + 7, d + 9); else set(d, d + 9);
+    })
+    // "aged 25 to 34", "between 25 and 34 years old", "25-34 year olds"
+    || take(new RegExp(String.raw`(?:aged?|ages)\s+(?:between\s+)?(\d{2})\s*(?:-|–|to|and)\s*(\d{2})${YEARS}?${NOT_A_COUNT}`), (m) => {
+      const a = parseInt(m[1]), b = parseInt(m[2]); if (ok(a) && ok(b)) set(Math.min(a, b), Math.max(a, b));
+    })
+    || take(new RegExp(String.raw`(?:between\s+)?(?<![\d.])(\d{2})\s*(?:-|–|to|and)\s*(\d{2})${YEARS}`), (m) => {
+      const a = parseInt(m[1]), b = parseInt(m[2]); if (ok(a) && ok(b)) set(Math.min(a, b), Math.max(a, b));
+    })
+    // "aged 30+", "30+ years old"
+    || take(new RegExp(String.raw`(?:(?:aged?|ages)\s+(\d{2})\s*\+|(?<![\d.])(\d{2})\s*\+${YEARS})`), (m) => { const n = parseInt(m[1] ?? m[2]); if (ok(n)) set(n, null); })
+    // "over 30", "older than 30", "at least 30 years old"; "over" excludes the number itself, "at least" keeps it.
+    || take(new RegExp(String.raw`(?<!engagement\s)(?<!rate\s)(over|above|older than|more than|past|at least)\s+(?:the age of\s+)?(\d{2})${YEARS}?${NOT_A_COUNT}`), (m) => {
+      const n = parseInt(m[2]); if (ok(n)) set(m[1] === "at least" ? n : n + 1, null);
+    })
+    || take(new RegExp(String.raw`(?<!engagement\s)(?<!rate\s)(under|below|younger than|less than|at most)\s+(?:the age of\s+)?(\d{2})${YEARS}?${NOT_A_COUNT}`), (m) => {
+      const n = parseInt(m[2]); if (ok(n)) set(null, m[1] === "at most" ? n : n - 1);
+    })
+    // "30 years old", "a 30-year-old"
+    || take(new RegExp(String.raw`(?<![\d.])(\d{2})[- ]?(?:years?[- ]olds?|y\/?o)(?![a-z])`), (m) => { const n = parseInt(m[1]); if (ok(n)) set(n, n); });
+  }
 
   // Audience location, before places: "US audience" is about followers, "in Florida" about the creator.
   const US = String.raw`(?<![a-z])(?:u\.?s\.?(?:a\.?)?|united states|american?|stateside)(?![a-z])`;
@@ -254,14 +296,16 @@ Return only a JSON object with these keys:
 - "minEngagement": number (percent) or null.
 - "stages": array, each one of ["roster","applicant","prospect"]. Empty unless the request says so. "signed" or "on the roster" means ["roster"]. "applicants" means ["applicant"]. "prospects" means ["prospect"]. "not signed yet" or "worth signing" means ["applicant","prospect"].
 - "genders": array, each one of ["woman","man"]. Empty unless the request asks for women or men ("female creators", "guys who..."). A product for women or men ("women's running shoes") is a topic, not a gender.
+- "minAge", "maxAge": the creator's own age in whole years, both ends included, or null. "over 30" means minAge 31, "under 25" means maxAge 24, "in their twenties" means 20 to 29. An age is never a follower count.
 - "minAudienceUS": number 0-100 or null. The minimum share of the creator's AUDIENCE that is in the US. "US audience" or "mostly American followers" with no number means 50. This is about followers, not where the creator lives: "in Florida" is a location, not an audience filter.
 - "semantic": the topic, product or vibe to match against their posts, as a short phrase. Empty string if the request is filters only. It is matched against post captions and CRM notes, so "open to paid usage" or "delivers early" belong here. Never repeat a niche, place, stage or number here.
 
 Examples:
-"micro foodies in Chicago with a mostly US audience who post about air fryers" -> {"niches":["food"],"locations":["Chicago"],"stages":[],"genders":[],"minFollowers":10000,"maxFollowers":100000,"minEngagement":null,"minAudienceUS":50,"semantic":"air fryers"}
-"applicants who post about trail shoes" -> {"niches":[],"locations":[],"stages":["applicant"],"genders":[],"minFollowers":null,"maxFollowers":null,"minEngagement":null,"minAudienceUS":null,"semantic":"trail shoes"}
-"women who run and review men's trail shoes" -> {"niches":["running"],"locations":[],"stages":[],"genders":["woman"],"minFollowers":null,"maxFollowers":null,"minEngagement":null,"minAudienceUS":null,"semantic":"men's trail shoes"}
-"a snack for after the gym" -> {"niches":[],"locations":[],"stages":[],"genders":[],"minFollowers":null,"maxFollowers":null,"minEngagement":null,"minAudienceUS":null,"semantic":"a snack for after the gym"}`;
+"micro foodies in Chicago with a mostly US audience who post about air fryers" -> {"niches":["food"],"locations":["Chicago"],"stages":[],"genders":[],"minAge":null,"maxAge":null,"minFollowers":10000,"maxFollowers":100000,"minEngagement":null,"minAudienceUS":50,"semantic":"air fryers"}
+"applicants who post about trail shoes" -> {"niches":[],"locations":[],"stages":["applicant"],"genders":[],"minAge":null,"maxAge":null,"minFollowers":null,"maxFollowers":null,"minEngagement":null,"minAudienceUS":null,"semantic":"trail shoes"}
+"women who run and review men's trail shoes" -> {"niches":["running"],"locations":[],"stages":[],"genders":["woman"],"minAge":null,"maxAge":null,"minFollowers":null,"maxFollowers":null,"minEngagement":null,"minAudienceUS":null,"semantic":"men's trail shoes"}
+"fitness creators who are over 30" -> {"niches":["fitness"],"locations":[],"stages":[],"genders":[],"minAge":31,"maxAge":null,"minFollowers":null,"maxFollowers":null,"minEngagement":null,"minAudienceUS":null,"semantic":""}
+"a snack for after the gym" -> {"niches":[],"locations":[],"stages":[],"genders":[],"minAge":null,"maxAge":null,"minFollowers":null,"maxFollowers":null,"minEngagement":null,"minAudienceUS":null,"semantic":"a snack for after the gym"}`;
 
 export const llmConfigured = () => !!process.env.OPENAI_API_KEY;
 
@@ -290,6 +334,10 @@ export function sanitize(raw: unknown): ParsedQuery {
     out.stages = STAGES.filter((st) => (r.stages as unknown[]).some((x) => typeof x === "string" && x.toLowerCase() === st));
   if (Array.isArray(r.genders))
     out.genders = GENDERS.filter((g) => (r.genders as unknown[]).some((x) => typeof x === "string" && x.toLowerCase() === g));
+  const age = (v: unknown) => { const n = num(v); return n == null ? null : Math.max(16, Math.min(80, Math.round(n))); };
+  out.minAge = age(r.minAge);
+  out.maxAge = age(r.maxAge);
+  if (out.minAge != null && out.maxAge != null && out.minAge > out.maxAge) [out.minAge, out.maxAge] = [out.maxAge, out.minAge];
   const us = num(r.minAudienceUS);
   out.minAudienceUS = us == null ? null : Math.min(100, Math.round(us));
   if (out.minFollowers != null && out.maxFollowers != null && out.minFollowers > out.maxFollowers)
@@ -320,6 +368,15 @@ export async function parseWithLLM(query: string): Promise<ParsedQuery> {
   if (!parsed.semantic) parsed.semantic = rules.semantic;
   // Gender is read from plain words, which the rules do exactly; the model is not asked to guess it.
   parsed.genders = rules.genders;
+  // Age is read the same way. And when the only number in the sentence was an age, a follower
+  // bound from the model is that age misread ("over 30" came back as over 500K followers).
+  parsed.minAge = rules.minAge;
+  parsed.maxAge = rules.maxAge;
+  if ((rules.minAge ?? rules.maxAge) != null && rules.minFollowers == null && rules.maxFollowers == null) {
+    if ((parsed.minFollowers ?? parsed.maxFollowers) != null) console.warn("LLM parser: follower bound dropped, the number in the brief was an age");
+    parsed.minFollowers = parsed.maxFollowers = null;
+    parsed.semantic = parsed.semantic.replace(/\b(?:over|under|above|below|aged?)\s+\d{2}\b|\b\d{2}\s*\+/gi, " ").replace(/\s+/g, " ").trim();
+  }
   // Numbers are where the model slips ("50K+" came back as 500000) and where the rules are
   // exact. When the rules read a figure out of the sentence, theirs wins.
   for (const key of ["minFollowers", "maxFollowers", "minEngagement", "minAudienceUS"] as const) {

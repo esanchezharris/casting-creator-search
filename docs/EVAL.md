@@ -223,3 +223,23 @@ Rules + keywords is unchanged. LLM + embeddings kept its ranking scores and
 lost one tuned filter case on this run. Expected-result lists were not
 edited for the new posts. LLM + keywords and rules + embeddings were not
 rerun.
+
+## Addendum: age filter (20 Nov 2026, after the posts)
+
+Creators now have an age and a brief can ask for one ("over 30", "under 25",
+"in their twenties", "aged 25 to 34"). The bug that prompted it: the LLM
+parser read "fitness creators who are over 30" as fitness with over 500K
+followers. Age is now read by the rules, and the eval fails any case where an
+age is read that was not asked for. Five briefs were added (65 in all, marked
+`"added": "age"`), one of them a follower figure that must not become an age
+("over 30k followers").
+
+| Mode | Tuned filters | Tuned P@5 | Tuned recall | Tuned nobody-fits | Held-out filters | Held-out P@5 | Held-out recall | Held-out nobody-fits |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Rules + keywords | 55/55 | 0.89 | 0.77 | 4/4 | 7/10 | 0.80 | 0.80 | 1/1 |
+| LLM + embeddings | 55/55 | 0.84 | 0.75 | 2/4 | 7/10 | 0.63 | 1.00 | 1/1 |
+
+All five new briefs pass in both modes and no earlier brief picked up an age.
+The new cases were written alongside the rule, so they are tuned cases.
+Phrasings not covered: "Gen Z", "millennials", "college-age", "30+" with no
+unit. LLM + keywords and rules + embeddings were not rerun.

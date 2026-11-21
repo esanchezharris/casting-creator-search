@@ -18,12 +18,17 @@ const followerText = (q: ParsedQuery) =>
   q.minFollowers != null && q.maxFollowers != null ? `${compact(q.minFollowers)} to ${compact(q.maxFollowers)}`
   : q.minFollowers != null ? `over ${compact(q.minFollowers)}` : `under ${compact(q.maxFollowers!)}`;
 
+export const ageText = (q: ParsedQuery) =>
+  q.minAge != null && q.maxAge != null ? (q.minAge === q.maxAge ? `aged ${q.minAge}` : `aged ${q.minAge} to ${q.maxAge}`)
+  : q.minAge != null ? `aged ${q.minAge} or over` : `aged ${q.maxAge} or under`;
+
 /** The filters as one plain sentence, for the shortlist's first line when chips were edited by hand. */
 export function summarize(q: ParsedQuery): string {
   const parts: string[] = [];
   if (q.stages.length) parts.push(q.stages.map((s) => STAGE_CHIP[s]).join(" or "));
   if (q.genders.length) parts.push(q.genders.map((g) => (g === "woman" ? "women" : "men")).join(" or "));
   if (q.niches.length) parts.push(q.niches.join(" or "));
+  if (q.minAge != null || q.maxAge != null) parts.push(ageText(q));
   if (q.locations.length) parts.push(`in ${q.locations.map((l) => l.label).join(" or ")}`);
   if (q.minFollowers != null || q.maxFollowers != null) parts.push(`${followerText(q)} followers`);
   if (q.minEngagement != null) parts.push(`${q.minEngagement}%+ engagement`);
@@ -124,7 +129,7 @@ export function FilterChips({ parsed: q, places, onChange, addClassName }: { par
     </span>
   );
 
-  const any = q.niches.length || q.locations.length || q.stages.length || q.genders.length || has.followers || has.engagement || has.audience || q.semantic;
+  const any = q.niches.length || q.locations.length || q.stages.length || q.genders.length || q.minAge != null || q.maxAge != null || has.followers || has.engagement || has.audience || q.semantic;
   const freeNiches = NICHES.filter((n) => !q.niches.includes(n));
   const freeStages = STAGES.filter((s) => !q.stages.includes(s));
   const typed = place.trim().toLowerCase();
@@ -138,6 +143,7 @@ export function FilterChips({ parsed: q, places, onChange, addClassName }: { par
       {q.stages.map((s) => plain(`st-${s}`, STAGE_CHIP[s], { ...q, stages: q.stages.filter((x) => x !== s) }))}
       {q.genders.map((g) => plain(`g-${g}`, g === "woman" ? "women" : "men", { ...q, genders: q.genders.filter((x) => x !== g) }))}
       {q.niches.map((n) => plain(`n-${n}`, n, { ...q, niches: q.niches.filter((x) => x !== n) }))}
+      {(q.minAge != null || q.maxAge != null) && plain("age", ageText(q), { ...q, minAge: null, maxAge: null })}
       {q.locations.map((l) => plain(`l-${l.field}-${l.value}`, <>{dim("in")} {l.label}</>, { ...q, locations: q.locations.filter((x) => x !== l) }))}
       {has.followers && editable("followers", <>{followerText(q)} {dim("followers")}</>, { ...q, minFollowers: null, maxFollowers: null })}
       {has.engagement && editable("engagement", <>{q.minEngagement}%+ {dim("engagement")}</>, { ...q, minEngagement: null })}

@@ -14,6 +14,8 @@ export function applyFilters(q: ParsedQuery): Creator[] {
     if (q.niches.length && !q.niches.some((n) => c.niches.includes(n))) return false;
     if (q.locations.length && !q.locations.some((l) => c[l.field] === l.value)) return false;
     if (q.genders.length && !q.genders.includes(c.gender)) return false;
+    if (q.minAge != null && c.age < q.minAge) return false;
+    if (q.maxAge != null && c.age > q.maxAge) return false;
     if (q.minFollowers != null && c.followers < q.minFollowers) return false;
     if (q.maxFollowers != null && c.followers > q.maxFollowers) return false;
     if (q.minEngagement != null && c.engagement < q.minEngagement) return false;

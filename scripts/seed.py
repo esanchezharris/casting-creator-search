@@ -289,6 +289,9 @@ def build(n: int, seed: int) -> list[dict]:
             "name": f"{first} {last}",
             "handle": handle,
             "gender": "man" if first in MEN else "woman",
+            # The same draw scripts/media_prompts.py makes first for this creator's look, so the
+            # age on file is the age the photos were prompted with.
+            "age": random.Random(f"media-{cid}").randint(22, 36),
             "stage": stage,
             "partner": rnd.choice(PARTNERS) if on_roster else None,
             "campaigns": rnd.randint(1, 14) if on_roster else None,

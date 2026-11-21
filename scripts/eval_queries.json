@@ -360,7 +360,7 @@
     }
   },
   {
-    "query": "skincare creators, 10k–50k",
+    "query": "skincare creators, 10k\u201350k",
     "kind": "odd-range",
     "filters": {
       "niches": [
@@ -726,5 +726,59 @@
       "racing shoes"
     ],
     "added": "gender"
+  },
+  {
+    "query": "fitness creators who are over 30",
+    "filters": {
+      "niches": [
+        "fitness"
+      ],
+      "minAge": 31
+    },
+    "added": "age"
+  },
+  {
+    "query": "foodies aged 25 to 34",
+    "filters": {
+      "niches": [
+        "food"
+      ],
+      "minAge": 25,
+      "maxAge": 34
+    },
+    "added": "age"
+  },
+  {
+    "query": "men older than thirty-two",
+    "filters": {
+      "genders": [
+        "man"
+      ],
+      "minAge": 33
+    },
+    "added": "age"
+  },
+  {
+    "query": "runners with over 30k followers",
+    "filters": {
+      "niches": [
+        "running"
+      ],
+      "minFollowers": 30000
+    },
+    "added": "age"
+  },
+  {
+    "query": "creators in their twenties who post about energy drinks",
+    "filters": {
+      "minAge": 20,
+      "maxAge": 29
+    },
+    "relevant_if_caption_has": [
+      "energy drink",
+      "pre-workout",
+      "caffeine"
+    ],
+    "added": "age"
   }
 ]
