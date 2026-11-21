@@ -243,3 +243,27 @@ All five new briefs pass in both modes and no earlier brief picked up an age.
 The new cases were written alongside the rule, so they are tuned cases.
 Phrasings not covered: "Gen Z", "millennials", "college-age", "30+" with no
 unit. LLM + keywords and rules + embeddings were not rerun.
+
+## Addendum: 170 creators (20 Nov 2026, night)
+
+Fifty creators were added (beauty, skincare, hair and fashion; 46 women, 4
+men), with 26 new captions. The data is now 170 creators: 107 roster, 40
+applicants, 23 prospects. Embeddings were rebuilt (1,390 texts). Everything
+above this section was measured on 120 creators and is left as it was. Same
+65 briefs; expected results are computed from the data, so they moved with
+it.
+
+| Mode | Tuned filters | Tuned P@5 | Tuned recall | Tuned nobody-fits | Held-out filters | Held-out P@5 | Held-out recall | Held-out nobody-fits |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Rules + keywords | 55/55 | 0.87 | 0.74 | 4/4 | 7/10 | 0.86 | 0.86 | 1/1 |
+| LLM + embeddings | 54/55 | 0.88 | 0.74 | 1/4 | 7/10 | 0.70 | 1.00 | 1/1 |
+
+What changed with more data: the two rankers are now level on precision in
+the tuned set (0.87 and 0.88), where rules + keywords led before. The
+embedding ranker's known weakness got worse: it returned people for three of
+the four tuned briefs that nobody fits (it was two of four). The one tuned
+filter miss in LLM mode is "fitness creators who post about running", read
+on this run with running as a second creator type. The cutoffs were not
+retuned for the larger data. LLM + keywords and rules + embeddings were not
+rerun. The three briefs in docs/DEMO.md return the same counts as before
+(9; 1 on the roster and 4 not yet; 7).

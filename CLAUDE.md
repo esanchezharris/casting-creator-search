@@ -40,7 +40,7 @@ three stages. It does not crawl social platforms for strangers.
 ## Commands
     npm run dev      # http://localhost:3000
     npm run build    # must pass before you call anything done
-    npm run seed     # regenerate data/creators.json (120 fictional creators, seed 11)
+    npm run seed     # regenerate data/creators.json (170 fictional creators, seed 11)
     npm run embed    # needs OPENAI_API_KEY; writes data/embeddings.json (rerun after a reseed)
     npm run eval     # needs the app running; prints parser + P@5 scores
 
@@ -88,7 +88,7 @@ per creator). Files live in `public/creators/<id>/` (`1.jpg` to `5.jpg`,
 optional `clip.mp4`); `python3 scripts/apply_media.py` points
 `data/creators.json` at them and records which post each photo shows
 (`photoPosts`). Rerun it after `npm run seed`. Likes and top comments per post
-(`reactions`) come from the seed script. All 120 creators have five photos
+(`reactions`) come from the seed script. All 170 creators have five photos
 and 23 have a clip (20 Nov). Lesson from the batch: Soul 2.0 draws app chrome
 and garbled labels when the prompt says "Instagram", "phone" or "selfie";
 Nano Banana Pro with a face reference was reliable, so every photo 1 was
@@ -112,6 +112,15 @@ a click opens quick look on that post. Clip stills are the clip's own first fram
 (`clip.jpg`, cut with ffmpeg; rerun `apply_media.py` after adding a clip).
 In quick look the big photo does not follow the mouse; thumbnails and `,` `.`
 change it.
+
+Second wave (20 Nov, night): 50 more creators (c121 to c170), drawn from
+their own random stream in `glam_wave()` in `scripts/seed.py` so the first
+120 never change. They are beauty, skincare, hair and fashion only, 46 women
+and 4 men, with 26 new captions (`CAPTIONS_MORE`) and matching scenes. The
+data is now 170: 107 roster, 40 applicants, 23 prospects; 131 women; 101
+with a beauty, skincare, hair or fashion first niche, beauty the largest.
+Five clips (c043, c076, c100, c102, c119) were remade from their clean first
+photo.
 
 Age (20 Nov, last): each creator has `age`, drawn in `seed.py` from the same
 stream `media_prompts.py` uses, so it matches the photos. Age in a brief is

@@ -231,14 +231,92 @@ def build(n: int, seed: int) -> list[dict]:
     stages = ["roster"] * n_roster + ["applicant"] * n_app + ["prospect"] * (n - n_roster - n_app)
     rnd.shuffle(stages)
 
-    creators = []
-    for i in range(n):
-        first, last = names[i]
-        stage = stages[i]
-        primary = rnd.choice(PRIMARY)
+    creators = [creator(rnd, i, *names[i], stages[i]) for i in range(n)]
+    creators += glam_wave(names[n:], n, seed)
+    add_extra_posts(creators)
+    add_reactions(creators)
+    return creators
+
+
+# The second wave. An agency like this one is mostly beauty, glam and fashion, and mostly
+# women, and the first 120 leaned towards fitness. These 50 are drawn from their own random
+# stream after the first 120, so nobody already in the data changes.
+WAVE_PRIMARY = ["beauty"] * 26 + ["skincare"] * 7 + ["fashion"] * 7 + ["hair"] * 6  # the women, exactly
+WAVE_PAIRS = {"beauty": ["skincare", "hair", "fashion"], "skincare": ["beauty"], "hair": ["beauty", "fashion"],
+              "fashion": ["beauty", "hair", "lifestyle"]}
+WAVE_STAGES = ["roster"] * 35 + ["applicant"] * 10 + ["prospect"] * 5
+WAVE_MEN = 4
+# Posts a man in this data would not plausibly have made; his captions are drawn from the rest.
+MALE_AVOID = ("dress", "makeup", "glam", "bronzer", "blush", "lip", "foundation", "protective styles", "heatless", "shapewear",
+              "blowout", "curly hair", "copper", "lash", "liner", "nails", "bridal", "bangs", "ballet", "handbag", "skin tint", "claw clip")
+CAPTIONS_MORE = {
+    "beauty": [
+        "Soft glam for a wedding: the exact products and the order I use them.",
+        "Red lip, nothing else. How to make it last through dinner.",
+        "Winged liner on hooded eyes, the tape trick that finally worked.",
+        "Trying the viral skin tint in four shades so you can find yours.",
+        "My everyday makeup bag, emptied out. What earns its place.",
+        "Lash extensions versus a good mascara: three weeks of each.",
+        "Glam at 6am for a shoot. What long-wear actually means.",
+        "Fresh set: almond nails in a milky pink, and how I make them last.",
+    ],
+    "skincare": [
+        "Slugging for a week: what it did to my dry patches.",
+        "Niacinamide and vitamin C together? What my skin did.",
+        "Double cleansing after a full face of makeup, step by step.",
+        "Empties: eight skincare products I finished and three I'd repurchase.",
+        "LED mask, four weeks in. Honest before and after.",
+        "Lip care routine for when matte lipstick has ruined everything.",
+    ],
+    "hair": [
+        "Sleek blowout at home with one round brush.",
+        "Bridal hair trial: three updos, one winner.",
+        "Curtain bangs, cut at home. Brave or stupid, you decide.",
+        "Gloss treatment at home: shine without the salon bill.",
+        "Claw clip styles for second-day hair.",
+        "Hair perfume and a satin pillowcase: small things that made a difference.",
+    ],
+    "fashion": [
+        "Date night outfits, three budgets.",
+        "The little black dress, styled four ways.",
+        "Gold jewellery stack I wear every day, and what it cost.",
+        "Trying the ballet flat trend with jeans, a skirt and tailoring.",
+        "What I wore to fashion week, day by day.",
+        "Handbag collection, ranked by how often I actually carry them.",
+    ],
+}
+WAVE_CAPTIONS = {niche: caps + CAPTIONS_MORE.get(niche, []) for niche, caps in CAPTIONS.items()}
+
+
+def glam_wave(names: list[tuple[str, str]], start: int, seed: int) -> list[dict]:
+    rnd = random.Random(f"wave2-{seed}")
+    women = [n for n in names if n[0] not in MEN][:len(WAVE_STAGES) - WAVE_MEN]
+    men = [n for n in names if n[0] in MEN][:WAVE_MEN]
+    people = women + men
+    rnd.shuffle(people)
+    stages = list(WAVE_STAGES)
+    rnd.shuffle(stages)
+    primaries = list(WAVE_PRIMARY)
+    rnd.shuffle(primaries)
+    out = []
+    for k, (first, last) in enumerate(people):
+        man = first in MEN
+        out.append(creator(
+            rnd, start + k, first, last, stages[k],
+            primary_pool=["skincare", "fashion", "hair"] if man else [primaries.pop()],
+            pairs={"skincare": ["fashion"], "fashion": ["lifestyle"], "hair": ["fashion"]} if man else WAVE_PAIRS,
+            captions=WAVE_CAPTIONS, avoid=MALE_AVOID if man else ()))
+    return out
+
+
+def creator(rnd: random.Random, i: int, first: str, last: str, stage: str, primary_pool: list[str] = PRIMARY,
+            pairs: dict[str, list[str]] = PAIRS, captions: dict[str, list[str]] = CAPTIONS, avoid: tuple[str, ...] = ()) -> dict:
+    """One creator. The order of the random draws here is what keeps a reseed identical."""
+    if True:
+        primary = rnd.choice(primary_pool)
         niches = [primary]
         if rnd.random() < 0.6:
-            niches.append(rnd.choice(PAIRS[primary]))
+            niches.append(rnd.choice(pairs[primary]))
         city, region, country = rnd.choice(CITIES)
 
         # Log-uniform followers between 8K and 900K.
@@ -255,11 +333,11 @@ def build(n: int, seed: int) -> list[dict]:
         us = rnd.randint(55, 92) if band < 0.55 else rnd.randint(30, 54) if band < 0.85 else rnd.randint(6, 29)
         top = "United States" if us >= 45 else rnd.choice(OTHER_MARKETS)
 
-        pool = list(CAPTIONS[primary])
+        pool = [c for c in captions[primary] if not any(a in c.lower() for a in avoid)]
         rnd.shuffle(pool)
         caps = pool[:4]
         if len(niches) > 1:
-            second = list(CAPTIONS[niches[1]])
+            second = [c for c in captions[niches[1]] if not any(a in c.lower() for a in avoid)]
             rnd.shuffle(second)
             caps += second[:2]
         else:
@@ -284,7 +362,7 @@ def build(n: int, seed: int) -> list[dict]:
         handle = "@" + style.format(f=first.lower(), l=last.lower())
         cid = f"c{i + 1:03d}"
         on_roster = stage == "roster"
-        creators.append({
+        return {
             "id": cid,
             "name": f"{first} {last}",
             "handle": handle,
@@ -310,11 +388,7 @@ def build(n: int, seed: int) -> list[dict]:
             "notes": notes,
             # Filled by scripts/apply_media.py. Empty means the UI draws placeholders.
             "images": [],
-        })
-
-    add_extra_posts(creators)
-    add_reactions(creators)
-    return creators
+        }
 
 
 # The two profiles the demo opens to show a longer history. Their extra posts are
@@ -387,6 +461,7 @@ def add_reactions(creators: list[dict]) -> None:
     creator, so adding this did not change any other generated field."""
     niche_of = {cap: niche for niche, caps in CAPTIONS.items() for cap in caps}
     niche_of.update({cap: niche for niche, caps in EXTRA_POSTS.values() for cap in caps})
+    niche_of.update({cap: niche for niche, caps in CAPTIONS_MORE.items() for cap in caps})
     for c in creators:
         # How many days ago each post went up. Its own stream too, and drawn first so the
         # order of a profile's posts has nothing to do with the order they were written in.
