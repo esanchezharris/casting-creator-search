@@ -89,6 +89,8 @@ export default function Page() {
   const input = useRef<HTMLInputElement>(null);
   const cards = useRef<(HTMLElement | null)[]>([]);
   const sheet = useRef<HTMLDivElement>(null);
+  // The frame each card is showing, so quick look opens on the post being looked at.
+  const frames = useRef(new Map<string, number>());
   const latest = useRef(0);
   // The words behind the results on screen, kept for the shortlist's first line.
   const asked = useRef("");
@@ -207,6 +209,7 @@ export default function Page() {
       onFocus={() => setFocus(i)}
       onLeave={() => { if (!looking) setFocus((f) => (f === i ? -1 : f)); }}
       onOpen={() => { setFocus(i); setLooking(true); }}
+      onFrame={(index) => { frames.current.set(r.creator.id, index); }}
     />
   );
 
@@ -373,6 +376,7 @@ export default function Page() {
           picked={picked.has(open.creator.id)}
           onPick={() => toggle(open.creator)}
           onClose={() => setLooking(false)}
+          start={frames.current.get(open.creator.id) ?? 0}
         />
       )}
 

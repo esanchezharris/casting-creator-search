@@ -19,6 +19,7 @@ export const STAGE_LABEL: Record<Stage, string> = { roster: "Roster", applicant:
 
 /** Every profile shows this many frames, whether they are photos or placeholders. */
 export const FRAME_COUNT = 5;
+const FIVE = [0, 1, 2, 3, 4];
 export const initials = (name: string) => name.split(" ").map((w) => w[0]).join("").slice(0, 2);
 const isTyping = (t: EventTarget | null) =>
   t instanceof HTMLTextAreaElement || t instanceof HTMLInputElement || t instanceof HTMLSelectElement;
@@ -26,11 +27,12 @@ const isTyping = (t: EventTarget | null) =>
 /**
  * Scrub preview: the pointer's horizontal position across the photo picks
  * which frame is showing, so a whole profile can be skimmed in one sweep.
- * Mouse scrubs on hover; touch scrubs while dragging sideways. With
+ * Mouse scrubs on hover; touch scrubs while dragging sideways. The frame
+ * stays where it was left. With
  * `keys` on, `,` and `.` step through the frames too.
  */
-export function useScrub(n: number, keys: boolean) {
-  const [index, setIndex] = useState(0);
+export function useScrub(n: number, keys: boolean, start = 0) {
+  const [index, setIndex] = useState(Math.min(start, n - 1));
   const at = (e: React.PointerEvent<HTMLDivElement>) => {
     const box = e.currentTarget.getBoundingClientRect();
     const x = (e.clientX - box.left) / box.width;
@@ -53,9 +55,8 @@ export function useScrub(n: number, keys: boolean) {
     onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => {
       if (e.pointerType === "mouse" || e.currentTarget.hasPointerCapture(e.pointerId)) at(e);
     },
-    // A finger lifting should leave the frame where it was; a mouse leaving resets it.
-    onPointerLeave: (e: React.PointerEvent<HTMLDivElement>) => { if (e.pointerType === "mouse") setIndex(0); },
   };
+  // Nothing resets on leave: the frame last looked at stays, and a click opens quick look on it.
   return { index, setIndex, bind };
 }
 
@@ -182,14 +183,18 @@ type Props = {
   onFocus: () => void;
   onLeave: () => void;
   onOpen: () => void;
+  /** Reports the frame on show, so quick look can open on the same post. */
+  onFrame: (index: number) => void;
 };
 
 export const CreatorCard = forwardRef<HTMLElement, Props>(function CreatorCard(
-  { result, picked, focused, onPick, onFocus, onLeave, onOpen }, ref,
+  { result, picked, focused, onPick, onFocus, onLeave, onOpen, onFrame }, ref,
 ) {
   const { creator, reason, warning } = result;
-  const count = creator.images.length || FRAME_COUNT;
+  // A card previews the newest five posts, however long the history; quick look has the rest.
+  const count = Math.min(creator.images.length || FRAME_COUNT, FRAME_COUNT);
   const { index, bind } = useScrub(count, focused);
+  useEffect(() => { onFrame(index); }, [index]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Only the first photo loads up front. The rest load once the card is within
   // about a row of the viewport, so the first sweep never lands on a blank frame.
@@ -227,7 +232,7 @@ export const CreatorCard = forwardRef<HTMLElement, Props>(function CreatorCard(
           onPointerDownCapture={(e) => { downX.current = e.clientX; }}
           onClick={(e) => { if (Math.abs(e.clientX - downX.current) < 8) onOpen(); }}
         >
-          <Frames creator={creator} index={index} loadAll={near} />
+          <Frames creator={creator} index={index} loadAll={near} order={FIVE.slice(0, count)} />
           {/* The clip plays while the mouse or the arrow keys are on its frame. */}
           {creator.video && near && <Clip src={creator.video} active={focused && index === creator.videoAt} />}
           {creator.video && index === creator.videoAt && !focused && <ClipMark />}

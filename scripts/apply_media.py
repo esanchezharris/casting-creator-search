@@ -18,8 +18,9 @@ PLANS = ROOT / "data" / "media_prompts.json"
 # prompts written by hand. This is which post each of their photos shows.
 PILOT_POSTS = {"c095": [2, 3, 1, 0, 4], "c116": [0, 2, 4, 1, 5], "c081": [2, 0, 3, 4, 1], "c102": [5, 1, 4, 0, 5]}
 
-# Every clip was animated from the creator's first photo, except this one.
-CLIP_PHOTO = {"c117": 5}
+# Every clip was animated from the creator's first photo, except these (checked by eye
+# against each clip's first frame).
+CLIP_PHOTO = {"c117": 5, "c054": 2}
 
 
 def main() -> None:

@@ -26,6 +26,8 @@ type Props = {
   picked: boolean;
   onPick: () => void;
   onClose: () => void;
+  /** The post to open on: the frame the card behind was showing. */
+  start: number;
 };
 
 /**
@@ -37,11 +39,10 @@ type Props = {
  * handles them), and the parent keys this by creator id so it resets on each
  * move.
  */
-export function QuickLook({ result, position, picked, onPick, onClose }: Props) {
+export function QuickLook({ result, position, picked, onPick, onClose, start }: Props) {
   const { creator, reason, warning, matchedPost } = result;
   const count = creator.images.length || FRAME_COUNT;
-  // Here the photo stays where it was left when the mouse moves off to read the post.
-  const { index, setIndex, bind: { onPointerLeave: _reset, ...bind } } = useScrub(count, true);
+  const { index, setIndex, bind } = useScrub(count, true, start);
   const [sort, setSort] = useState<PostSort>("recent");
 
   const postOf = (photo: number) => creator.photoPosts?.[photo] ?? Math.min(photo, creator.captions.length - 1);
@@ -77,6 +78,14 @@ export function QuickLook({ result, position, picked, onPick, onClose }: Props) 
   }, [index, strip]);
 
   const show = (i: number, thumb = false) => { byThumb.current = thumb; setIndex(i); };
+  // Scrolling the strip slides thumbnails under a mouse that is not moving. Only a real
+  // movement of the mouse picks a thumbnail, so nothing changes until the hand does.
+  const mouse = useRef({ x: -1, y: -1 });
+  const moved = (e: React.PointerEvent) => {
+    const same = e.screenX === mouse.current.x && e.screenY === mouse.current.y;
+    mouse.current = { x: e.screenX, y: e.screenY };
+    return !same;
+  };
   const resort = (next: PostSort) => {
     setSort(next); setIndex(0);
     if (profile.current?.parentElement) profile.current.parentElement.scrollTop = 0;
@@ -92,7 +101,7 @@ export function QuickLook({ result, position, picked, onPick, onClose }: Props) 
       >
         {/* Media: the frame takes its width from the dialog's height, so the photo is never cropped or letterboxed. */}
         <div className="flex shrink-0 flex-col gap-2 bg-secondary p-3 md:h-full">
-          <div className="frame w-full md:h-[calc(var(--h)-132px)] md:w-auto" {...bind}>
+          <div className="frame w-full md:h-[calc(var(--h)-136px)] md:w-auto" {...bind}>
             <Frames creator={creator} index={index} loadAll order={order} />
             {creator.video && <Clip src={creator.video} active={index === clipAt} sound />}
             <Ticks count={count} index={index} show />
@@ -104,15 +113,16 @@ export function QuickLook({ result, position, picked, onPick, onClose }: Props) 
           </div>
 
           {/* Passing the mouse over a thumbnail shows it, like sweeping across the photo itself. A long history scrolls sideways. */}
-          <div className="h-16 w-0 min-w-full overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
+          <div className="-mx-1.5 -mb-1 h-[72px] w-0 min-w-[calc(100%+12px)] overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
             <div ref={strip} className="w-max">
-              <div className="flex gap-1.5 p-0.5">
+              {/* The padding is room for the ring around the thumbnail on show. */}
+              <div className="flex gap-1.5 p-1.5">
                 {order.map((p, i) => (
                   <button
                     key={p} aria-pressed={i === index}
                     aria-label={i === clipAt ? `Clip, post ${i + 1} of ${count}` : `Photo, post ${i + 1} of ${count}`}
                     className="press relative size-[60px] shrink-0 overflow-hidden rounded-lg bg-muted ring-offset-2 ring-offset-secondary aria-pressed:ring-2 aria-pressed:ring-foreground"
-                    onClick={() => show(i, true)} onPointerEnter={(e) => { if (e.pointerType === "mouse") show(i, true); }}
+                    onClick={() => show(i, true)} onPointerMove={(e) => { if (e.pointerType === "mouse" && moved(e) && i !== index) show(i, true); }}
                   >
                     {creator.images.length
                       ? <img src={creator.images[p]} alt="" draggable={false} className="size-full object-cover" />

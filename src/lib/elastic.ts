@@ -2,9 +2,10 @@
 
 import { useEffect, useRef } from "react";
 
-const MAX = 90;     // the furthest the content can be pulled, in px
-const GAIN = 0.16;  // how much of each wheel step becomes pull
-const DECAY = 0.86; // per frame; the content is always on its way back
+const MAX = 72;         // the furthest the content can be pulled, in px
+const PUSH = 5;         // speed (px/s) each px of wheel travel adds past the end
+const STIFFNESS = 210;  // the spring that brings the content back
+const DAMPING = 29;     // critical for that stiffness: it settles without wobbling
 
 /**
  * Scrolling past the end of a list pulls the content a little further and lets
@@ -22,12 +23,19 @@ export function useElastic<T extends HTMLElement>(axis: "x" | "y" = "y", page = 
     if (!body || !scroller || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     if (!page) { scroller.dataset.elastic = ""; scroller.style.overscrollBehavior = "none"; }
 
-    let pull = 0, raf = 0;
-    const tick = () => {
-      pull *= DECAY;
-      if (Math.abs(pull) < 0.4) pull = 0;
-      body.style.transform = pull ? `translate3d(${axis === "x" ? -pull : 0}px, ${axis === "y" ? -pull : 0}px, 0)` : "";
-      raf = pull ? requestAnimationFrame(tick) : 0;
+    // A damped spring, stepped in real time so it moves the same at 60 and 120 frames a second.
+    // The wheel only ever adds speed; the position itself is never set by hand, which is what
+    // keeps it from jumping when wheel steps arrive unevenly.
+    let pull = 0, speed = 0, raf = 0, last = 0;
+    const tick = (now: number) => {
+      const dt = Math.min(0.032, (now - last) / 1000 || 0.016);
+      last = now;
+      speed += (-STIFFNESS * pull - DAMPING * speed) * dt;
+      pull += speed * dt;
+      const rest = Math.abs(pull) < 0.3 && Math.abs(speed) < 8;
+      if (rest) pull = speed = 0;
+      body.style.transform = rest ? "" : `translate3d(${axis === "x" ? -pull : 0}px, ${axis === "y" ? -pull : 0}px, 0)`;
+      raf = rest ? 0 : requestAnimationFrame(tick);
     };
     const onWheel = (e: WheelEvent) => {
       if (e.ctrlKey) return;
@@ -45,8 +53,11 @@ export function useElastic<T extends HTMLElement>(axis: "x" | "y" = "y", page = 
       }
       const past = (d < 0 && before <= 0) || (d > 0 && before >= max - 1);
       if (!past) return;
-      pull += d * GAIN * (1 - Math.min(1, Math.abs(pull) / MAX));
-      if (!raf) raf = requestAnimationFrame(tick);
+      // One wheel step can be large (a notched mouse wheel), so it is capped; the further out
+      // the content already is, the less a step adds.
+      const step = Math.max(-120, Math.min(120, d));
+      speed += step * PUSH * (1 - Math.min(1, Math.abs(pull) / MAX));
+      if (!raf) { last = performance.now(); raf = requestAnimationFrame(tick); }
     };
     const target: HTMLElement | Window = page ? window : scroller;
     target.addEventListener("wheel", onWheel as EventListener, { passive: false });

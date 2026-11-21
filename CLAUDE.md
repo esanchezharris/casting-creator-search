@@ -107,6 +107,10 @@ Recent / Popular order. Sofia Santos (c004) and Valentina Vargas (c116) have
 six extra posts and photos (`EXTRA_POSTS` in `scripts/seed.py`, photos 6 to
 11 prompted by hand). After a reseed run `apply_media.py` and `npm run embed`.
 
+Cards preview the newest five posts only and keep the frame last looked at;
+a click opens quick look on that post. Clip stills are the photo the clip was
+made from, a re-render of the same scene, so small details can differ.
+
 Scrolling: `src/lib/elastic.ts` gives the filter list, the page, the quick
 look column and the thumbnail strip the same small pull-and-settle at their
 ends (wheel and trackpad; the browser's own bounce is turned off). The
