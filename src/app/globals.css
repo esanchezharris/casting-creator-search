@@ -64,6 +64,11 @@ html[data-mode="dark"] {
 /* While the theme is switching nothing fades: the whole page changes in one frame. */
 html.theming, html.theming *, html.theming *::before, html.theming *::after { transition: none !important; }
 
+/* From this width up the filter panel sits beside the results instead of over them. */
+@theme {
+  --breakpoint-side: 30rem;
+}
+
 @theme inline {
   --font-sans: var(--font-geist), "Helvetica Neue", Arial, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, Menlo, monospace;

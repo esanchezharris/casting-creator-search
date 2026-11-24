@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { compact } from "@/components/CreatorCard";
 import { parseCount, type FilterEdit } from "@/components/FilterChips";
@@ -120,7 +120,7 @@ type Props = {
  * same parsed query a typed brief produces, so a brief fills this panel in and
  * changing the panel refines the brief.
  */
-export function FilterPanel({ parsed: q, places, facets, onChange }: Props) {
+export const FilterPanel = memo(function FilterPanel({ parsed: q, places, facets, onChange }: Props) {
   const [place, setPlace] = useState("");
   const typed = place.trim().toLowerCase();
   const suggestions = places
@@ -261,4 +261,4 @@ export function FilterPanel({ parsed: q, places, facets, onChange }: Props) {
       </Section>
     </div>
   );
-}
+});

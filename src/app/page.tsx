@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Copy, Grid2x2, Grid3x3, Keyboard, Moon, PanelLeftClose, Search, SlidersHorizontal, Sun } from "lucide-react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Copy, Keyboard, Moon, PanelLeftClose, Search, SlidersHorizontal, Sun } from "lucide-react";
 import { toast } from "sonner";
+import { CardSize } from "@/components/CardSize";
 import { CreatorCard, compact, initials, money } from "@/components/CreatorCard";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { FilterChips, summarize, type FilterEdit } from "@/components/FilterChips";
@@ -16,10 +16,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { QuickLook } from "@/components/QuickLook";
 import { Segmented } from "@/components/Segmented";
 import { useElastic } from "@/lib/elastic";
-import { DEFAULT_CARD, saveCardSize, savedCardSize, setMode, useMode } from "@/lib/view";
+import { glide } from "@/lib/glide";
+import { cardSize, GAP, GLIDING, holdColumns, setMode, useMode } from "@/lib/view";
 import type { Creator, SearchResponse, SearchResult } from "@/lib/types";
 
 const NO_FILTERS = { niches: [], locations: [], stages: [], genders: [], minAge: null, maxAge: null, minFollowers: null, maxFollowers: null, maxRate: null, minEngagement: null, minAudienceUS: null, semantic: "" };
+const NO_PLACES: string[] = [], NO_FACETS: Record<string, number> = {};
 const PANEL = "casting.filters.v1";
 const KEYS: [string[], string][] = [
   [["←", "→", "↑", "↓"], "Move between creators"], [["Space"], "Open or close quick look"], [["S"], "Shortlist the focused creator"],
@@ -30,8 +32,8 @@ const PARSER_LABEL = { llm: "Read by the language model", rules: "Read by the ru
 const RANKER_LABEL = { embeddings: "ranked by meaning", keywords: "ranked by keywords", hybrid: "ranked by keywords and meaning", reach: "ordered by recent reach" };
 
 const STORE = "casting.shortlist.v1";
-// The grid's column gap, and the narrowest and widest a creator card may be drawn.
-const GAP = 4, SMALLEST = 150, LARGEST = 400;
+// The filter panel's width beside the grid, and the window width from which it sits there (`side` in globals.css).
+const SIDE = 264, BESIDE = "(min-width: 30rem)";
 type Shortlist = { brief: string; creators: Creator[] };
 
 function sorted(list: SearchResult[], sort: Sort): SearchResult[] {
@@ -62,6 +64,35 @@ function shortlistText({ brief, creators }: Shortlist): string {
   return out.join("\n");
 }
 
+type SlotProps = {
+  result: SearchResult; index: number; picked: boolean; focused: boolean;
+  place: (index: number, el: HTMLElement | null) => void;
+  onPick: (creator: Creator) => void;
+  onFocus: (index: number) => void;
+  onLeave: (index: number) => void;
+  onOpen: (index: number) => void;
+  onFrame: (id: string, frame: number) => void;
+};
+
+/**
+ * One creator in the grid. It is drawn again only when its own result, pick or highlight changes.
+ * Without this, a hover, a card size change or the filter panel redrew every card on the page,
+ * and the page stood still while it did.
+ */
+const Slot = memo(function Slot({ result, index, picked, focused, place, onPick, onFocus, onLeave, onOpen, onFrame }: SlotProps) {
+  return (
+    <CreatorCard
+      ref={(el) => { place(index, el); }}
+      result={result} picked={picked} focused={focused}
+      onPick={() => onPick(result.creator)}
+      onFocus={() => onFocus(index)}
+      onLeave={() => onLeave(index)}
+      onOpen={() => onOpen(index)}
+      onFrame={(frame) => onFrame(result.creator.id, frame)}
+    />
+  );
+});
+
 export default function Page() {
   const [query, setQuery] = useState("");
   const [data, setData] = useState<SearchResponse | null>(null);
@@ -82,20 +113,35 @@ export default function Page() {
   }, []);
   // The panel slides only when someone presses the button, not when the saved state is restored.
   const [slide, setSlide] = useState(false);
+  const side = useRef<HTMLElement>(null);
+  const sliding = useRef(0);
   const togglePanel = () => {
     setSlide(true);
-    setPanel((open) => {
-      try { localStorage.setItem(PANEL, open ? "closed" : "open"); } catch { /* not remembered */ }
-      return !open;
-    });
+    // Beside the grid, the panel takes or gives back its width over 200ms. The cards go straight to the
+    // number of columns that will fit once it has, and glide there, so no column jumps in halfway.
+    const aside = side.current, width = sheet.current?.clientWidth ?? 0;
+    if (aside && width > 0 && window.matchMedia(BESIDE).matches && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const room = width + (panel ? SIDE : -SIDE);
+      const columns = Math.max(1, Math.floor((room + GAP) / (cardSize() + GAP)));
+      glide(document.querySelectorAll(GLIDING), () => holdColumns(columns, room), 200);
+      // The grid goes back to fitting its own columns when the panel has finished moving, by the
+      // panel's own clock. The timer is only for a slide that never reports its end.
+      const turn = ++sliding.current;
+      const settle = (e?: TransitionEvent) => {
+        if (e && (e.target !== aside || e.propertyName !== "width")) return;
+        aside.removeEventListener("transitionend", settle);
+        window.clearTimeout(late);
+        if (turn === sliding.current) holdColumns();
+      };
+      const late = window.setTimeout(settle, 1500);
+      aside.addEventListener("transitionend", settle);
+    }
+    try { localStorage.setItem(PANEL, panel ? "closed" : "open"); } catch { /* not remembered */ }
+    setPanel(!panel);
   };
   const filterList = useElastic<HTMLDivElement>();
   const pageBody = useElastic<HTMLDivElement>("y", true);
   const mode = useMode();
-  // Card size. The grid fits as many columns as it can of at least `cardMin` pixels, so the
-  // slider has one stop per number of columns that fits the grid's width right now.
-  const [cardMin, setCardMin] = useState(DEFAULT_CARD);
-  const [width, setWidth] = useState(0);
 
   const input = useRef<HTMLTextAreaElement>(null);
   const cards = useRef<(HTMLElement | null)[]>([]);
@@ -126,33 +172,8 @@ export default function Page() {
   }, []);
 
   useEffect(() => { run({ query: "" }); }, [run]);
-
-  useEffect(() => {
-    setCardMin(savedCardSize());
-    if (!sheet.current) return;
-    const seen = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
-    seen.observe(sheet.current);
-    return () => seen.disconnect();
-  }, []);
-  const columnsAt = (min: number) => Math.max(1, Math.floor((width + GAP) / (min + GAP)));
-  const most = columnsAt(SMALLEST);
-  const fewest = Math.min(most, Math.max(1, Math.ceil((width + GAP) / (LARGEST + GAP))));
-  const stops = most - fewest;
-  // Left is the densest grid, right the largest cards.
-  const stop = most - Math.min(most, Math.max(fewest, columnsAt(cardMin)));
-  const resize = (next: number) => {
-    const columns = most - Math.max(0, Math.min(stops, next));
-    // The middle of the range of widths that gives this many columns, so a small change in the window keeps the count.
-    const px = Math.round(((width + GAP) / (columns + 1) + (width + GAP) / columns) / 2 - GAP);
-    if (px === cardMin) return;
-    // The creator at the top of the screen stays where it is while the grid reflows around it.
-    const at = window.scrollY > 0 ? cards.current.findIndex((el) => el && el.getBoundingClientRect().bottom > 56) : -1;
-    const el = at >= 0 ? cards.current[at] : null;
-    const before = el?.getBoundingClientRect().top;
-    saveCardSize(px);
-    if (el && before != null) window.scrollBy(0, el.getBoundingClientRect().top - before);
-    setCardMin(px);
-  };
+  // The same function on every draw, so the filter panel is left alone unless the answer changes.
+  const onFilters = useCallback((filters: FilterEdit) => { run({ filters }); }, [run]);
 
   // The shortlist survives a reload. Storage can be blocked or full, so every touch is guarded.
   useEffect(() => {
@@ -248,18 +269,18 @@ export default function Page() {
   const open = looking && focus >= 0 ? all[focus] : null;
   const first = !data && loading;
 
+  // The same functions on every draw, so a card that has not changed is left alone.
+  const lookingNow = useRef(looking);
+  useEffect(() => { lookingNow.current = looking; }, [looking]);
+  const place = useCallback((i: number, el: HTMLElement | null) => { cards.current[i] = el; }, []);
+  const onFocus = useCallback((i: number) => setFocus(i), []);
+  const onLeave = useCallback((i: number) => { if (!lookingNow.current) setFocus((f) => (f === i ? -1 : f)); }, []);
+  const onOpen = useCallback((i: number) => { setFocus(i); setLooking(true); }, []);
+  const onFrame = useCallback((id: string, frame: number) => { frames.current.set(id, frame); }, []);
   const card = (r: SearchResult, i: number) => (
-    <CreatorCard
-      key={r.creator.id}
-      ref={(el) => { cards.current[i] = el; }}
-      result={r}
-      picked={picked.has(r.creator.id)}
-      focused={focus === i}
-      onPick={() => toggle(r.creator)}
-      onFocus={() => setFocus(i)}
-      onLeave={() => { if (!looking) setFocus((f) => (f === i ? -1 : f)); }}
-      onOpen={() => { setFocus(i); setLooking(true); }}
-      onFrame={(index) => { frames.current.set(r.creator.id, index); }}
+    <Slot
+      key={r.creator.id} result={r} index={i} picked={picked.has(r.creator.id)} focused={focus === i}
+      place={place} onPick={toggle} onFocus={onFocus} onLeave={onLeave} onOpen={onOpen} onFrame={onFrame}
     />
   );
 
@@ -268,19 +289,21 @@ export default function Page() {
   const active = activeCount(parsed);
 
   return (
-    <div className="lg:flex">
-      {panel && <div className="fixed inset-0 z-30 bg-(--scrim) lg:hidden" onClick={togglePanel} aria-hidden="true" />}
-      {/* On a wide screen the panel's width closes to nothing and its contents, pinned to the right edge, slide out with it. */}
+    <div className="side:flex">
+      {panel && <div className="fixed inset-0 z-30 bg-(--scrim) side:hidden" onClick={togglePanel} aria-hidden="true" />}
+      {/* Beside the grid, the panel's width closes to nothing and its contents, pinned to the right edge, slide out with it.
+          Only a phone-width window is too narrow for that; there the panel lies over the page. */}
       <aside
-        aria-label="Filters" inert={!panel}
+        ref={side} aria-label="Filters" inert={!panel}
         className={cn(
-          "shrink-0 bg-secondary max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-40 max-lg:w-[280px] max-lg:border-r lg:sticky lg:top-0 lg:h-screen lg:overflow-hidden",
-          slide && "lg:transition-[width] lg:duration-200 lg:ease-(--ease-out) motion-reduce:transition-none",
-          panel ? "lg:w-[264px]" : "max-lg:hidden lg:w-0",
+          "shrink-0 bg-secondary max-side:fixed max-side:inset-y-0 max-side:left-0 max-side:z-40 max-side:w-[280px] max-side:border-r side:sticky side:top-0 side:h-screen side:overflow-hidden",
+          slide && "side:transition-[width] side:duration-200 side:ease-(--ease-out) motion-reduce:transition-none",
+          panel ? "side:w-[264px]" : "max-side:hidden side:w-0",
         )}
       >
-          <div className="flex h-full flex-col lg:absolute lg:inset-y-0 lg:right-0 lg:w-[264px] lg:border-r">
-            <div className="flex h-12 shrink-0 items-center justify-between border-b pr-2 pl-4">
+          <div className="flex h-full flex-col side:absolute side:inset-y-0 side:right-0 side:w-[264px] side:border-r">
+            {/* 48px and then the line, the same as the bar over the results, so the two lines meet. */}
+            <div className="flex h-[49px] shrink-0 items-center justify-between border-b pr-2 pl-4">
               <h2 className="text-[14px] font-medium">
                 Filters{active > 0 && <span className="ml-1.5 font-normal text-muted-foreground tabular-nums">{active}</span>}
               </h2>
@@ -298,16 +321,17 @@ export default function Page() {
             {/* Reaching the end of this list gives a little and settles; it never starts scrolling the results. */}
             <div className="min-h-0 flex-1 overflow-y-auto">
               <div ref={filterList}>
-                <FilterPanel parsed={parsed} places={data?.places ?? []} facets={data?.facets ?? {}} onChange={(filters) => run({ filters })} />
+                <FilterPanel parsed={parsed} places={data?.places ?? NO_PLACES} facets={data?.facets ?? NO_FACETS} onChange={onFilters} />
               </div>
             </div>
           </div>
       </aside>
 
-      <main className="min-w-0 flex-1 px-4 pb-28 sm:px-5">
-        <div className="sticky top-0 z-20 -mx-4 border-b bg-background/90 px-4 backdrop-blur-md sm:-mx-5 sm:px-5">
+      {/* Clipped sideways: while the panel closes, the grid is already as wide as it is about to be. */}
+      <main className="min-w-0 flex-1 overflow-x-clip px-4 pb-28 sm:px-5">
+        <div className="@container/bar sticky top-0 z-20 -mx-4 border-b bg-background/90 px-4 backdrop-blur-md sm:-mx-5 sm:px-5">
           <form className="flex min-h-12 items-start gap-2 py-2" onSubmit={(e) => { e.preventDefault(); submit(query); }}>
-            <span className="mr-1 flex h-8 items-center text-[15px] font-medium tracking-[-0.01em]">Casting</span>
+            <span className="mr-1 flex h-8 items-center text-[15px] font-medium tracking-[-0.01em] @max-[320px]/bar:hidden">Casting</span>
             {!panel && (
               <Button type="button" variant="outline" size="sm" className="press h-8 gap-1.5 bg-card px-2.5 text-[13px]" onClick={togglePanel}>
                 <SlidersHorizontal className="size-3.5" />Filters{active > 0 && <span className="text-muted-foreground tabular-nums">{active}</span>}
@@ -323,30 +347,10 @@ export default function Page() {
                 onFocus={() => setTyping(true)} onBlur={() => setTyping(false)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(query); } }}
               />
-              <Button type="submit" size="sm" aria-busy={loading} className="press -my-px h-6 shrink-0 rounded-md px-2 text-[13px]">Search</Button>
+              <Button type="submit" size="sm" aria-busy={loading} className="press -my-0.5 h-6 shrink-0 rounded-md px-2 text-[13px]">Search</Button>
             </div>
             {/* View controls: how big the cards are, and light or dark. */}
-            <div className="flex h-8 shrink-0 items-center gap-0.5 max-md:hidden">
-              <Tooltip>
-                <TooltipTrigger render={<Button type="button" variant="ghost" size="icon" className="press size-7 text-muted-foreground" aria-label="Smaller cards" disabled={stop <= 0} onClick={() => resize(stop - 1)} />}>
-                  <Grid3x3 className="size-3.5" />
-                </TooltipTrigger>
-                <TooltipContent>Smaller cards</TooltipContent>
-              </Tooltip>
-              {/* After a drag the keyboard goes back to the grid, so the arrow keys move between creators again. */}
-              <div className="w-20" onPointerUp={(e) => { const box = e.currentTarget; requestAnimationFrame(() => { if (box.contains(document.activeElement)) (document.activeElement as HTMLElement).blur(); }); }}>
-                <Slider
-                  labels={["Card size"]} min={0} max={Math.max(1, stops)} step={1} disabled={stops === 0}
-                  value={[stop]} onValueChange={(v) => resize((v as number[])[0])}
-                />
-              </div>
-              <Tooltip>
-                <TooltipTrigger render={<Button type="button" variant="ghost" size="icon" className="press size-7 text-muted-foreground" aria-label="Larger cards" disabled={stop >= stops} onClick={() => resize(stop + 1)} />}>
-                  <Grid2x2 className="size-3.5" />
-                </TooltipTrigger>
-                <TooltipContent>Larger cards</TooltipContent>
-              </Tooltip>
-            </div>
+            <div className="shrink-0 @max-[500px]/bar:hidden"><CardSize grid={sheet} /></div>
             <Tooltip>
               <TooltipTrigger render={<Button type="button" variant="ghost" size="icon" className="press size-8 text-muted-foreground" aria-label={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"} onClick={() => setMode(mode === "dark" ? "light" : "dark")} />}>
                 {mode === "dark" ? <Sun /> : <Moon />}
@@ -354,7 +358,7 @@ export default function Page() {
               <TooltipContent>{mode === "dark" ? "Light mode" : "Dark mode"}</TooltipContent>
             </Tooltip>
             <Popover>
-              <PopoverTrigger render={<Button type="button" variant="ghost" size="icon" className="press size-8 text-muted-foreground max-sm:hidden" aria-label="Keyboard shortcuts" />}>
+              <PopoverTrigger render={<Button type="button" variant="ghost" size="icon" className="press size-8 text-muted-foreground @max-[400px]/bar:hidden" aria-label="Keyboard shortcuts" />}>
                 <Keyboard />
               </PopoverTrigger>
               <PopoverContent align="end" sideOffset={8} className="w-72 gap-0 p-3 text-[13px]">
@@ -423,23 +427,26 @@ export default function Page() {
           </div>
         )}
 
-        <div className={cn("-mx-2 transition-opacity duration-150", loading && "pointer-events-none opacity-50")}>
-          <div className={cn(grid, "mt-2")} ref={sheet}>{main.map((r, i) => card(r, i))}</div>
+        {/* Everything that is drawn larger or smaller while the card size slider is dragged. */}
+        <div data-zoom className={cn("-mx-2 transition-opacity duration-150", loading && "pointer-events-none opacity-50")}>
+          <div data-grid className={cn(grid, "mt-2")} ref={sheet}>{main.map((r, i) => card(r, i))}</div>
 
           {off.length > 0 && (
-            <section className="mx-2 mt-8 border-t pt-5" aria-label="Not on the roster yet">
+            <section className="mx-2 mt-8" aria-label="Not on the roster yet">
+              <div data-glide className="border-t pt-5">
               <h2 className="text-[15px] font-medium">Not on the roster yet</h2>
               <p className="mt-0.5 max-w-2xl text-[14px] text-pretty text-muted-foreground">
                 {main.length === 0 ? "Nobody on the roster fits this brief."
                   : `Only ${main.length} on the roster ${main.length === 1 ? "fits" : "fit"} this brief.`}
                 {" "}These applicants and prospects do. They have no agreed rate and would need signing first.
               </p>
-              <div className={cn(grid, "-mx-2 mt-3")}>{off.map((r, i) => card(r, main.length + i))}</div>
+              </div>
+              <div data-grid className={cn(grid, "-mx-2 mt-3")}>{off.map((r, i) => card(r, main.length + i))}</div>
             </section>
           )}
         </div>
 
-        <footer className="mt-12 border-t pt-4 text-[13px] text-muted-foreground">
+        <footer data-glide className="mt-12 border-t pt-4 text-[13px] text-muted-foreground">
           <p className="max-w-3xl text-pretty">
             Demo data. Every creator, number, post and comment here is fictional.
             {all.some((r) => r.creator.images.length > 0) && " The photos and clips are AI-generated; nobody in them is a real person."}
@@ -465,7 +472,7 @@ export default function Page() {
           aria-label="Shortlist"
           className={cn(
             "tray fixed bottom-4 left-1/2 z-40 flex w-[min(640px,calc(100%-24px))] -translate-x-1/2 items-center gap-3 rounded-xl border bg-card py-1.5 pr-1.5 pl-3 shadow-(--tray-shadow)",
-            panel && "lg:left-[calc(50%+132px)]",
+            panel && "side:left-[calc(50%+132px)] side:w-[min(640px,calc(100%-288px))]",
           )}
         >
           <div className="flex shrink-0 -space-x-2 max-sm:hidden">

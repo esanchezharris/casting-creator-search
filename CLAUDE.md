@@ -191,6 +191,68 @@ is the default; the choice is remembered. `src/lib/view.ts` has the helpers
 and `src/lib/view-boot.ts` the script that applies both before first paint.
 Checked in a headless browser at 1440px, not by hand.
 
+Panel beside the grid, gliding resize (23 Nov, later): Emilio works in the
+app's browser pane, which is often 500 to 850px wide. The filter panel used
+to lie over the page below 1024px; it now sits beside the grid from 480px up
+(`side` breakpoint in `globals.css`, `SIDE` and `BESIDE` in `page.tsx`) and
+only lies over the page on a phone-width window. The top bar hides the size
+slider, the keyboard button and the wordmark by the room the bar has
+(container queries on `bar`), not by window width. `src/lib/glide.ts` moves
+cards from where they were drawn to where a layout change puts them
+(transform only, 240ms, starts again from the current position if
+interrupted, off for reduced motion). It runs when the card size changes by
+drag or button, not by keyboard, and when the panel opens or closes: there
+the grid is set to its final column count at once and released on the
+panel's `transitionend`. `src/components/CardSize.tsx` is the slider: the
+thumb follows the pointer between stops and settles on one when let go.
+Checked in a headless browser at 1440, 838, 640 and 505px. The browser pane
+drew about one frame a second while driven by tools, so the motion itself
+has not been watched at full speed there.
+
+Redraws (23 Nov, last): Emilio found the slider drag and the panel slide
+jerky while the size buttons were smooth. Measured with
+a CPU slowed 4x: every size change, panel toggle and hover redrew all 178
+cards in React and stalled the page for 0.6 to 0.8s, which the buttons' glide
+survived only because transforms run off the main thread. Fixes, keep them:
+cards render through a memoised `Slot` in `page.tsx` with stable callbacks,
+`FilterPanel` is memoised, and `CardSize` owns the card size and the grid's
+measured width, so nothing that changes per frame or per pointer move is
+state in `Page`. Mid-drag the size goes to the grids as an inline column
+count (`holdColumns` in `view.ts`); the `--card-min` write to `<html>`, which
+restyles every card, waits until 320ms after release. During the panel slide
+the grids are held at their final width as well as column count, so the
+cards are laid out once. After: longest stall about 0.1 to 0.16s at 4x, and
+60 frames a second unthrottled, with `next dev`.
+
+Continuous card size (23 Nov, last; spring added 24 Nov): with the stalls
+gone Emilio still found the slider jerky, because the cards waited and then
+moved a whole column at a time. A drag now zooms the results
+(`src/lib/zoom.ts`: `scale` on the `data-zoom` wrapper in `page.tsx`, centred
+on the row at the top of the screen), and as the drawn size passes a little
+over halfway between stops the grid re-wraps into the next column count at
+the same drawn size and `glide` moves the cards to their new places.
+
+The drawn size does not follow the pointer directly. Tied straight to the
+pointer it was smooth only at a medium pace: the track is 80px, so in a slow
+drag the cards sat still three frames in four and then stepped 2 to 3px, and
+in a fast one they jumped up to 68px in a frame; and `glide` re-applied the
+old card size for one frame at every re-wrap. So the thumb stays under the
+pointer and the size chases it on a critically damped spring, one frame at a
+time (`STIFF` in `src/components/CardSize.tsx`, about 80ms behind at a steady
+pace), and carries on to the nearest stop on release. During a drag `glide`
+is called with `sized` off, so it moves cards and leaves their size to the
+zoom. This is the one deliberate exception to "nothing that follows the
+pointer animates". Buttons and keys still step; reduced motion gets no zoom
+and no spring. Measured per frame in a headless browser at 1440px (scripts
+were run from a scratch folder with playwright-core, not in the repo): slow
+drag, the card changes size on 143 of 170 frames in steps of about 0.5px;
+fast drag, one rise and fall peaking near 23px a frame with no held frames;
+no frame over 25ms at either pace. With the CPU slowed 4x every zoom frame
+takes two frames and a re-wrap about 100ms: Chrome records the page again on
+each frame the scale changes (about 3ms unthrottled), and `will-change`,
+`transform` in place of `scale`, and clipping the sheet made no difference.
+Not watched by eye at full speed.
+
 Look prototypes (23 Nov, decided): Emilio asked for alternative looks and
 liked none of them more than the original, so the original stays and got the
 view controls above. The four directions (Board, Ledger, Sheet, Paper) were
