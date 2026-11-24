@@ -74,7 +74,10 @@ export function useElastic<T extends HTMLElement>(axis: "x" | "y" = "y", page = 
       if (!raf) { last = now; raf = requestAnimationFrame(tick); }
     };
     const target: HTMLElement | Window = page ? window : scroller;
-    target.addEventListener("wheel", onWheel as EventListener, { passive: false });
+    // Only a sideways list ever cancels a wheel step, so only it may. Safari does not scroll an
+    // element at all when it has `overscroll-behavior: none` and a wheel listener that could
+    // cancel (measured in WebKit: either alone is fine, the two together leave the page still).
+    target.addEventListener("wheel", onWheel as EventListener, { passive: axis !== "x" });
     return () => {
       target.removeEventListener("wheel", onWheel as EventListener);
       cancelAnimationFrame(raf);

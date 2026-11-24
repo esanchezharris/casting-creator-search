@@ -36,6 +36,10 @@ const STORE = "casting.shortlist.v1";
 const SIDE = 264, BESIDE = "(min-width: 30rem)";
 type Shortlist = { brief: string; creators: Creator[] };
 
+// A brief with no topic has nothing to match against: the list already comes in order of recent
+// reach, so "Best match" would be a second name for the same order and is left out.
+const SORTS_NO_TOPIC = SORTS.filter(([key]) => key !== "match");
+
 function sorted(list: SearchResult[], sort: Sort): SearchResult[] {
   const out = [...list];
   if (sort === "reach") out.sort((a, b) => b.creator.recentReach - a.creator.recentReach);
@@ -287,6 +291,7 @@ export default function Page() {
   const grid = "grid grid-cols-[repeat(auto-fill,minmax(min(100%,var(--card-min,220px)),1fr))] gap-x-1 gap-y-4";
   const parsed = data?.parsed ?? NO_FILTERS;
   const active = activeCount(parsed);
+  const byTopic = data != null && data.ranker !== "reach";
 
   return (
     <div className="side:flex">
@@ -395,7 +400,7 @@ export default function Page() {
               </span>
             )}
             <div className="-mx-1 max-w-full overflow-x-auto px-1 [scrollbar-width:none]">
-              <Segmented label="Sort by" value={sort} options={SORTS} onChange={setSort} />
+              <Segmented label="Sort by" value={!byTopic && sort === "match" ? "reach" : sort} options={byTopic ? SORTS : SORTS_NO_TOPIC} onChange={setSort} />
             </div>
           </div>
         </div>

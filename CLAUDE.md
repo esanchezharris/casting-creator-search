@@ -130,6 +130,8 @@ earlier sets too average-looking. Total is 178 (115 roster).
 
 Default view: with no topic the search returns every stage in one list by
 recent reach. Roster-first grouping applies only when the brief has a topic.
+The sort control offers "Best match" only then too: with no topic it would be
+the same order as "Recent reach" (24 Nov).
 
 Budget (20 Nov, last): `maxRate` in `ParsedQuery`, read by the rules from a
 dollar amount, with a "Rate per reel" slider. It never rules out a creator
@@ -146,7 +148,12 @@ the model is dropped.
 Scrolling: `src/lib/elastic.ts` gives the filter list, the page, the quick
 look column and the thumbnail strip the same small pull-and-settle at their
 ends (wheel and trackpad; the browser's own bounce is turned off). The
-filter panel slides by animating its width for 200ms.
+filter panel slides by animating its width for 200ms. The wheel listeners
+are passive except on the thumbnail strip: Safari will not scroll an element
+that has `overscroll-behavior: none` and a wheel listener that could cancel,
+which left the whole page unscrollable there until 24 Nov. Scrolling is
+checked in Playwright's WebKit build as well as Chromium, not in Safari
+itself.
 
 Checked in a browser at 1440px. Phone layout is out of scope: this is for a
 laptop demo. Not checked: how the elastic scroll feels on a real trackpad
