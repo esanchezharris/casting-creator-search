@@ -2,11 +2,15 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Dark styles follow the theme set on <html>, not the operating system. */
+@custom-variant dark (&:is([data-mode="dark"] *));
+
 /*
   Design tokens. The palette follows docs/reference/questionnaire.png:
   warm paper ground, white surfaces with a hairline warm-grey border, near-black
   ink, and one red accent. They are mapped onto shadcn's variable names so every
-  component in src/components/ui picks them up. Do not add colours here.
+  component in src/components/ui picks them up. Dark mode sets the same names
+  again below. Do not add colours here.
 */
 :root {
   --background: #edeae4;
@@ -28,8 +32,37 @@
   --input: #d9d6cf;
   --ring: #171715;
   --radius: 0.625rem;
+  --frame-radius: 12px;
+  --scrim: rgb(23 23 21 / 0.45);
+  --tray-shadow: 0 8px 30px rgb(23 23 21 / 0.14);
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
+
+/* The same tokens after dark: warm charcoal ground, raised surfaces a step lighter, paper-white ink. */
+html[data-mode="dark"] {
+  color-scheme: dark;
+  --background: #191816;
+  --foreground: #efece6;
+  --card: #252420;
+  --card-foreground: #efece6;
+  --popover: #2a2925;
+  --popover-foreground: #efece6;
+  --primary: #efece6;
+  --primary-foreground: #191816;
+  --secondary: #1f1e1b;
+  --secondary-foreground: #efece6;
+  --muted: #2e2c28;
+  --muted-foreground: #a5a199;
+  --accent: #2e2c28;
+  --accent-foreground: #efece6;
+  --border: #35332e;
+  --input: #454239;
+  --ring: #efece6;
+  --scrim: rgb(0 0 0 / 0.65);
+  --tray-shadow: 0 8px 30px rgb(0 0 0 / 0.6);
+}
+/* While the theme is switching nothing fades: the whole page changes in one frame. */
+html.theming, html.theming *, html.theming *::before, html.theming *::after { transition: none !important; }
 
 @theme inline {
   --font-sans: var(--font-geist), "Helvetica Neue", Arial, sans-serif;
@@ -77,7 +110,7 @@
    Switching is instant on purpose, because it follows the pointer. */
 .frame {
   position: relative; aspect-ratio: 4 / 5; overflow: hidden;
-  border-radius: 12px; background: var(--muted);
+  border-radius: var(--frame-radius); background: var(--muted);
   cursor: ew-resize; touch-action: pan-y; user-select: none; -webkit-user-select: none;
 }
 .frame img {
@@ -102,9 +135,9 @@
 .ph.on { display: grid; }
 .ph b { font-size: 56px; font-weight: 500; letter-spacing: -0.04em; line-height: 1; color: var(--muted-foreground); }
 .ph span { position: absolute; left: 12px; top: 12px; font-size: 13px; color: var(--muted-foreground); }
-.ph[data-i="0"] { background: color-mix(in srgb, var(--border) 35%, #fff); }
-.ph[data-i="1"] { background: color-mix(in srgb, var(--border) 55%, #fff); }
-.ph[data-i="2"] { background: color-mix(in srgb, var(--border) 78%, #fff); }
+.ph[data-i="0"] { background: color-mix(in srgb, var(--border) 35%, var(--card)); }
+.ph[data-i="1"] { background: color-mix(in srgb, var(--border) 55%, var(--card)); }
+.ph[data-i="2"] { background: color-mix(in srgb, var(--border) 78%, var(--card)); }
 .ph[data-i="3"] { background: var(--border); }
 .ph[data-i="4"] { background: color-mix(in srgb, var(--border) 84%, var(--muted-foreground)); }
 .frame:has(.ph) .ticks i { background: color-mix(in srgb, var(--foreground) 16%, transparent); }

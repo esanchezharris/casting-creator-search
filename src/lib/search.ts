@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import creatorsJson from "../../data/creators.json";
 import { closest } from "./fuzzy";
-import { Creator, ParsedQuery, PlanPick, SearchResult } from "./types";
+import { Creator, ParsedQuery, SearchResult } from "./types";
 
 export const creators = creatorsJson as Creator[];
 
@@ -82,8 +82,7 @@ function rankByKeywords(pool: Creator[], semantic: string): SearchResult[] {
     const reason = noteWins ? `CRM note: “${clip(notes[0].text)}”`
       : posts.length ? `${posts.length} of ${creator.captions.length} recent posts match: “${clip(posts[0].cap)}”`
       : null;
-    const partial = Math.max(posts[0]?.hits ?? 0, notes[0]?.hits ?? 0) < q.length;
-    return { creator, score, reason, matchedPost: posts.length ? posts[0].i : null, warning: null, partial };
+    return { creator, score, reason, matchedPost: posts.length ? posts[0].i : null, warning: null };
   });
 }
 
@@ -266,58 +265,6 @@ export async function search(q: ParsedQuery, forced?: Forced): Promise<{ results
 
   // A brief with a topic: roster first. Only when the roster is thin do we show who would be worth signing.
   const results = ranked.filter((r) => r.creator.stage === "roster");
-  // A brief that asks for more than five needs the others shown sooner.
-  const offRoster = results.length < Math.max(ROSTER_MIN, q.brief?.count ?? 0) ? ranked.filter((r) => r.creator.stage !== "roster") : [];
+  const offRoster = results.length < ROSTER_MIN ? ranked.filter((r) => r.creator.stage !== "roster") : [];
   return { results, offRoster, ranker };
-}
-
-const short = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M` : `${Math.round(n / 1000)}K`);
-
-/**
- * For a shortlist that the exact matches cannot fill. Everyone returned meets the brief's hard
- * requirements (creator type, place, gender, age, audience, rate); what differs is how strong
- * the fit is. Best first:
- *   1. posts about the topic, and is just outside a follower range the brief gave as a
- *      preference (down to half the minimum, up to double the maximum)
- *   2. meets every requirement, and has a post with some of the topic's words
- *   3. meets every requirement, but has no recent post about the topic
- *   4. outside the range and no post
- * A range the brief states flatly is never stretched. Each creator comes with a sentence saying
- * what is weaker about them. `have` is who the search already returned.
- */
-export async function widen(q: ParsedQuery, have: Set<string>): Promise<PlanPick[]> {
-  const topic = q.semantic.trim();
-  const stretch = !!q.brief?.flexibleSize && (q.minFollowers != null || q.maxFollowers != null);
-  if (!topic && !stretch) return [];
-  const inStage = (c: Creator) => (q.stages.length ? q.stages.includes(c.stage) : c.stage === "roster");
-  const strict = applyFilters(q).filter(inStage);
-  const inRange = new Set(strict.map((c) => c.id));
-  const near = !stretch ? [] : applyFilters({
-    ...q, minFollowers: q.minFollowers != null ? q.minFollowers / 2 : null, maxFollowers: q.maxFollowers != null ? q.maxFollowers * 2 : null,
-  }).filter((c) => inStage(c) && !inRange.has(c.id));
-  const size = (c: Creator) => `${short(c.followers)} followers, just outside the range the brief prefers`;
-  const silent = `no recent post about ${topic}`;
-
-  const out: PlanPick[] = [];
-  const seen = new Set(have);
-  const add = (r: SearchResult, note: string, outside: boolean) => {
-    if (seen.has(r.creator.id)) return;
-    seen.add(r.creator.id);
-    out.push({ ...r, warning: topic ? conflictFor(r.creator, topic) : null, note, outside });
-  };
-  if (topic && near.length) for (const r of (await rank(near, topic)).ranked) add(r, size(r.creator), true);
-  const byReach = (list: Creator[]) => [...list].sort((a, b) => b.recentReach - a.recentReach)
-    .map((creator) => ({ creator, score: 0, reason: null, matchedPost: null, warning: null }));
-  // Before calling anyone silent, look for a post with some of the topic's words. The search can
-  // miss these: for "skin tint foundation" the embedding ranker preferred a "clean girl makeup"
-  // post and cut off the creators with a "Foundation wear test".
-  if (topic) {
-    const left = strict.filter((c) => !seen.has(c.id));
-    for (const r of rankByKeywords(left, topic).filter((x) => x.score > 0 && x.reason).sort((a, b) => b.score - a.score || b.creator.recentReach - a.creator.recentReach)) {
-      add({ ...r, partial: true }, `the post covers only part of "${topic}"`, false);
-    }
-    for (const r of byReach(strict)) add(r, silent, false);
-  }
-  for (const r of byReach(near)) add(r, topic ? `${size(r.creator)}; ${silent}` : size(r.creator), true);
-  return out;
 }

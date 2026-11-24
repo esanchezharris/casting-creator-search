@@ -3,14 +3,17 @@
 A shot-by-shot script for a screen recording. Spoken lines are in quotes and
 come to about 290 words, which is two minutes at an unhurried pace.
 
-Every number below was read off the app and `docs/EVAL.md` on 20 Nov 2026 with
-the default dataset (seed 11) in the mode the app runs in when
-`OPENAI_API_KEY` is set: LLM parser, hybrid ranker, gpt-4.1 reading whole
-briefs. The line next to the result count should read "Read by the language
+Every number below was read off the app and `docs/EVAL.md` with the default
+dataset (seed 11) in the mode the app runs in when `OPENAI_API_KEY` is set:
+LLM parser, hybrid ranker, gpt-4.1 reading whole briefs. Shots 2, 4 and 5
+were rechecked on 22 Nov 2026, after the proposed-shortlist panel was
+removed. The line next to the result count should read "Read by the language
 model, ranked by keywords and meaning". If it says "rule parser", the key is
-not set and shot 5 will not work.
+not set and shot 5 will not read the brief properly.
 The models are not perfectly repeatable, so run each brief once before
-recording. The brief in shot 5 gave the same shortlist five times out of five.
+recording. The brief in shot 5 was read the same way and returned the same
+five people three times out of three. The script has not been timed since
+shots 5 and 6 were rewritten.
 
 ## Before you record
 
@@ -24,8 +27,9 @@ recording. The brief in shot 5 gave the same shortlist five times out of five.
       Budget: $40,000 total
       Must not be exclusive with another makeup brand.
 
-- Have `docs/EVAL.md` open in a second tab at the section "Brief to
-  shortlist", with the table "Hybrid ranker, all six modes" one scroll above.
+- Have `docs/EVAL.md` open in a second tab at the table "Hybrid ranker, all
+  six modes", with the last section, "Reading a whole brief", ready to scroll
+  to.
 - With nothing typed the page lists all 178 creators, every stage together,
   highest recent reach first. A brief with a topic lists the roster first.
 - A search takes one to two seconds. Wait for "Searching…" to clear before
@@ -67,29 +71,33 @@ energy drinks`, press Enter. The count reads "2 on the roster, 4 not yet".
 
 **5. The whole brief (0:50 to 1:28)**
 
-Press `/`, paste the Aster brief, press Enter. The "Proposed shortlist" panel
-reads "4 of 4 · $30,030 of $40,000 · 1.8M reach". Point at "Brief read as",
-then down the four rows, then at the two "Left out" lines. Click "Add to
-shortlist", then "Copy reply".
+Press `/`, paste the Aster brief, press Enter. The chips read "beauty", "over
+250K followers", "65%+ US audience", "posts about skin tint foundation", and
+the count reads "2 on the roster, 3 not yet". Point at the chips, then at the
+"Check before pitching" box on Chloe Cho's card. Tick Felix Farrow, then Nora
+Hayashi in the second group. The bar reads "2 shortlisted · 825K reach ·
+$5,210 · 1 to sign". Click "Copy shortlist".
 
-> "Real briefs are emails, so I paste the whole thing. The model reads it:
-> four beauty creators, over 250K, 65 percent US audience, forty thousand
-> dollars in total, nobody exclusive with another makeup brand. Then plain
-> code builds the list: four creators for $30,030. It tells me which picks
-> have posted about foundation and which only meet the brief. Two people were
-> left out because the notes say they are exclusive with a makeup brand. And
-> any number the model returns that is not written in the brief gets
-> dropped."
+> "Real briefs are emails, so I paste the whole thing. A stronger model reads
+> it into the same filters: beauty, over 250K, 65 percent US audience, posts
+> about skin tint foundation. The head count and the forty thousand dollar
+> total are not filters, so they are left out, and any number the model
+> returns that is not written in the brief gets dropped. Two on the roster
+> fit, and one of them is flagged: the notes say she is exclusive with a
+> makeup brand. So I pick by hand. One from the roster, one prospect whose
+> post is about a skin tint, and the bar keeps the cost and who still has to
+> be signed."
 
 **6. The eval (1:28 to 1:52)**
 
 Switch to `docs/EVAL.md`. Point at the LLM + hybrid row of the search table,
-then at the "Brief to shortlist" table.
+then scroll to "Reading a whole brief".
 
-> "I measured both layers. Search, on seventy briefs: precision 0.99 on the
-> ones I tuned on, 0.82 on ten I held back. Shortlists, on six briefs I held
-> back: four of six passed every check first time. I fixed the failures and
-> wrote down what they were, including one my own checks had missed."
+> "I measured both steps. Search, on seventy briefs: precision 0.99 on the
+> ones I tuned on, 0.82 on ten I held back. Whole briefs, twelve of them
+> written like the emails a brand sends: every field read correctly on all
+> twelve, and everyone the grid showed met the brief. None of those twelve
+> is held back any more, and the doc says so."
 
 **7. Close (1:52 to 2:00)**
 
@@ -109,11 +117,10 @@ night` (7 creators, the first five quoting the sleep routine post).
 | --- | --- | --- |
 | Shot 2 | 9 roster matches | app, LLM + hybrid |
 | Shot 4 | 2 on the roster, 4 not yet | app, LLM + hybrid; `docs/eval-runs/llm-hybrid.txt` (6 expected, 6 returned) |
-| Shot 5 | 4 of 4, $30,030 of $40,000, two left out | app, and `docs/eval-runs/briefs-after-fixes.txt` (aster-skin-tint) |
-| Shot 5 | brief read as 4 creators, over 250K, 65%+, $40,000 total, no conflicts | same run, read 16/16 |
+| Shot 5 | brief read as beauty, over 250K, 65%+ US audience, skin tint foundation | app, and `docs/eval-runs/briefs-reading-only.txt` (aster-skin-tint, read 12/12) |
+| Shot 5 | 2 on the roster, 3 not yet; bar "2 shortlisted · 825K reach · $5,210 · 1 to sign" | app, 22 Nov, LLM + hybrid; `docs/screenshots/5-brief-read.png` and `6-pick-from-brief.png` |
 | Shot 6 | 70 briefs, P@5 0.99 tuned and 0.82 held out | `docs/EVAL.md`, "Hybrid ranker, all six modes", LLM + hybrid; `docs/eval-runs/llm-hybrid.txt` |
-| Shot 6 | 4 of 6 held-out shortlists passed first time | `docs/EVAL.md`, "Brief to shortlist"; `docs/eval-runs/briefs-first-full-run.txt` |
-| Shot 6 | one failure the checks missed | `docs/EVAL.md`, "What the held-out run found", third item |
+| Shot 6 | twelve briefs, every field read, everyone shown meets the brief | `docs/EVAL.md`, "Reading a whole brief": 144/144 fields in three runs; `docs/eval-runs/briefs-reading-only.txt` |
 
 ## Other briefs that show well
 

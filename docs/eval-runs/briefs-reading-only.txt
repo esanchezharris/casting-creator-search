@@ -1,0 +1,14 @@
+solara-spf-mist        read 12/12  shown 1 on the roster, 1 not yet  fit all  first five on topic 2/2  [llm/hybrid, 1368 ms]
+volt-energy-drink      read 12/12  shown 2 on the roster, 4 not yet  fit all  first five on topic 5/5  [llm/hybrid, 1359 ms]
+lune-wedding-guest     read 12/12  shown 7 on the roster, 0 not yet  fit all  first five on topic 5/5  [llm/hybrid, 1065 ms]
+halo-hair-oil          read 12/12  shown 1 on the roster, 1 not yet  fit all  first five on topic 2/2  [llm/hybrid, 1009 ms]
+stride-road-shoe       read 12/12  shown 3 on the roster, 1 not yet  fit all  first five on topic 2/4  [llm/hybrid, 890 ms]
+northfield-mens-spf    read 12/12  shown 0 on the roster, 1 not yet  fit all  first five on topic 1/1  [llm/hybrid, 1183 ms]
+peak-whey              read 12/12  shown 4 on the roster, 5 not yet  fit all  first five on topic 5/5  [llm/hybrid, 833 ms]
+petal-lip-oil          read 12/12  shown 3 on the roster, 0 not yet  fit all  first five on topic 3/3  [llm/hybrid, 1008 ms]
+form-leggings          read 12/12  shown 1 on the roster, 1 not yet  fit all  first five on topic 2/2  [llm/hybrid, 1273 ms]
+aster-skin-tint        read 12/12  shown 2 on the roster, 3 not yet  fit all  first five on topic 5/5  [llm/hybrid, 700 ms]
+dusk-sleep             read 12/12  shown 5 on the roster, 0 not yet  fit all  first five on topic 3/5  [llm/hybrid, 1064 ms]
+kicks-depot            read 12/12  shown 0 on the roster, 0 not yet  fit all  first five on topic 0/0  [llm/hybrid, 907 ms]
+
+fields read 144/144; briefs read with no mistake 12/12; briefs where everyone shown meets the brief 12/12; first five on topic, mean over 11 briefs that showed anyone: 0.92

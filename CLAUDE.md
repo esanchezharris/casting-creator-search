@@ -43,7 +43,7 @@ three stages. It does not crawl social platforms for strangers.
     npm run seed     # regenerate data/creators.json (178 fictional creators, seed 11)
     npm run embed    # needs OPENAI_API_KEY; writes data/embeddings.json (rerun after a reseed)
     npm run eval     # needs the app running; prints parser + P@5 scores
-    npm run eval:briefs  # needs the app running and a key; scores whole briefs and their shortlists
+    npm run eval:briefs  # needs the app running and a key; scores how whole pasted briefs are read
 
 ## How it works
 - `src/lib/parse.ts`: query -> `ParsedQuery` (niches, locations, stages,
@@ -161,21 +161,42 @@ on one server. Numbers for all six are in the last section of docs/EVAL.md
 (LLM + hybrid, tuned: P@5 0.99, recall 0.84, nobody-fits 4/4; held out 0.82,
 0.96, 1/1). Shot 5 of the demo now reads "2 on the roster, 4 not yet".
 
-Brief to shortlist (20 Nov, last of all): pasting a whole brief (over 160
-characters, several lines, or three sentences) goes to `readBrief` in
-`src/lib/parse.ts` (gpt-4.1, `BRIEF_MODEL` to change it). It returns the usual
-filters plus `brief` (brand, product, head count, total budget, deliverable,
-deadline, no conflicts, hedged follower range). Every number must be
-traceable to the text or it is dropped and shown as not used. A one-line
-brief gets a head count and a total budget from the rules. When
-`parsed.brief` is set the API returns `plan`: `buildPlan` in
-`src/lib/plan.ts` picks from the search results, then from `widen()` in
-`src/lib/search.ts` (creators who meet the brief but have no post about the
-product, each marked). No model picks anyone. `PlanPanel` shows it above the
-grid. `npm run eval:briefs` scores twelve briefs; all pass on the final code,
-so none is held out any more. First-run numbers and what each run found are
-in docs/EVAL.md, "Brief to shortlist". The demo script was rewritten around
-it (shot 5).
+Whole briefs (22 Nov): pasting a whole brief (over 160 characters, several
+lines, or three sentences) goes to `readBrief` in `src/lib/parse.ts`
+(gpt-4.1, `BRIEF_MODEL` to change it). It returns the same filters and topic
+as a typed line and nothing else. Every number must be traceable to the text
+or it is dropped (logged on the server). A head count and a total campaign
+budget are not filters: the rules strip them from a one-line brief and the
+model is told to leave them out. The person picks from the grid by hand.
+`npm run eval:briefs` scores twelve briefs on reading only (12 fields each)
+and on who the grid then shows: 144/144 fields in three runs on 22 Nov,
+none held out. Numbers are in docs/EVAL.md, "Reading a whole brief".
+
+Removed on 22 Nov, do not add back: the proposed-shortlist step (a panel
+above the grid that picked creators to a head count and total budget in
+code, `plan.ts`, `PlanPanel`, `widen()`, a reply to copy). Emilio found it
+made the project too convoluted to follow. It is in git at 88e1953, and
+docs/EVAL.md, "Brief to shortlist", is kept as the record of its runs.
+Labelled screenshots of the current app are in `docs/screenshots/`.
+
+View controls (23 Nov): two controls sit in the top bar after the search box.
+A card size slider with a button at each end: every stop is one more or one
+fewer column (3 to 7 at 1440px with the filters open), the choice is kept in
+`--card-min` on `<html>` and in localStorage, and the creator at the top of
+the screen stays in place while the grid reflows. Cards narrower than 180px
+put the stage under the name and set the four numbers two by two (container
+query in `CreatorCard`). A light/dark button: dark is the same tokens set
+again under `html[data-mode="dark"]` in `globals.css` (warm charcoal). Light
+is the default; the choice is remembered. `src/lib/view.ts` has the helpers
+and `src/lib/view-boot.ts` the script that applies both before first paint.
+Checked in a headless browser at 1440px, not by hand.
+
+Look prototypes (23 Nov, decided): Emilio asked for alternative looks and
+liked none of them more than the original, so the original stays and got the
+view controls above. The four directions (Board, Ledger, Sheet, Paper) were
+removed the same day on his word: the `/prototypes` page, its screenshots,
+`FilterPanel`'s `tips` prop and `src/components/ui/select.tsx`. They were
+never committed, so they are not in git. Do not rebuild them.
 
 Tried and not kept (20 Nov): an LLM judge as the ranker, and keywords-then-
 judge. Five models, all between 0.92 and 0.99 tuned P@5. The eval's labels are
@@ -199,6 +220,8 @@ Readability beats style every time.
   hand. Tokens are the shadcn variables at the top of `src/app/globals.css`,
   mapped to the warm palette. Do not add colors.
 - Warm paper ground (#edeae4), white surfaces, 1px warm-grey borders.
+  Dark mode is the same tokens on a warm charcoal ground (#191816); check
+  any new surface in both.
 - One sans family (Geist). Headings are weight 500 with tight tracking, never
   bold, never serif. No mono capitals.
 - Cards are image-first with no chrome until the mouse or the arrow keys are

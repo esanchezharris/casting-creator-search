@@ -461,6 +461,11 @@ unchanged, line for line.
 
 ## Brief to shortlist (20 Nov 2026, late)
 
+*Removed from the app on 22 Nov 2026; see "Reading a whole brief" at the end.
+This section is kept as the record of what was run. The code is in git at
+commit 88e1953. The reading step (item 1) is still in the app, without the
+extra fields.*
+
 The conclusion from the section above was that the search was near what its
 eval can measure, and that the gaps left were not ranking gaps: a head count,
 a total budget, "nobody with a competing deal", and briefs that arrive as an
@@ -544,3 +549,73 @@ Limits:
 - A conflict is found by word overlap between the note and the topic.
 - Nothing is picked when nobody passes the hard requirements; one held-out
   brief (streetwear in New York or Los Angeles) correctly gets an empty list.
+
+## Reading a whole brief (22 Nov 2026)
+
+The step that proposed a shortlist from a pasted brief was removed. It made
+the tool harder to follow than the search it sat on, and choosing people is
+the talent partner's job. What is kept is the reading: a pasted brief (over
+160 characters, several lines, or three sentences) goes to `readBrief`
+(gpt-4.1), which returns the same filters and topic as a typed line. A head
+count and a total campaign budget are not filters and are left out. Every
+number must still be traceable to the text of the brief. The person then
+picks from the grid, and the shortlist bar adds up reach and cost.
+
+`scripts/eval_briefs.py` now scores the same twelve briefs on two things:
+
+- **Reading**, 12 fields per brief: the eleven filters and whether the topic
+  names the product. A total budget that came back as a per-creator rate
+  would fail the rate field.
+- **Who is shown**: whether every creator the grid returns meets the
+  requirements a careful reader would set (checked against the data file,
+  not the app's own reading), and how many of the first five have a post
+  about the product. That last figure uses loose substring labels ("makeup"
+  counts for a skin tint), so it means "on topic", not "a perfect match".
+
+All runs: LLM parser, hybrid ranker, gpt-4.1 reading, 178 creators.
+
+| Run | Fields read | Briefs read with no mistake | Everyone shown meets the brief | First five on topic (11 briefs that showed anyone) |
+| --- | --- | --- | --- | --- |
+| First run after the removal | 143/144 | 11/12 | 12/12 | 0.92 |
+| After one line was added to the prompt, three runs | 144/144 each | 12/12 each | 12/12 each | 0.92 each |
+
+Saved run: `eval-runs/briefs-reading-only.txt`. The first run was not saved
+to a file.
+
+What the first run found: with the "product" field gone from what the model
+returns, the sneaker shop's brief came back with the topic "store opening"
+instead of sneakers. The prompt now says that for an event the topic is what
+the brand sells. That brief returns nobody either way, which is right:
+nobody in streetwear in New York or Los Angeles posts about sneakers.
+
+The two briefs below 5 of 5 on topic are the running shoe brief (2 of the 4
+shown) and the sleep brief (3 of 5).
+
+The search eval was rerun after the removal and did not move:
+
+| Parser + ranker | Tuned filters | Tuned P@5 | Tuned recall | Tuned nobody-fits | Held-out filters | Held-out P@5 | Held-out recall | Held-out nobody-fits |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Rules + keywords | 60/60 | 0.88 | 0.77 | 4/4 | 7/10 | 0.86 | 0.86 | 1/1 |
+| Rules + hybrid | 60/60 | 0.96 | 0.86 | 4/4 | 7/10 | 0.86 | 0.96 | 1/1 |
+| LLM + hybrid (default with a key) | 60/60 | 0.99 | 0.84 | 4/4 | 8/10 | 0.82 | 0.96 | 1/1 |
+
+The other three modes were not rerun. Held-out filters for LLM + hybrid read
+8/10 on this run and 7/10 on 20 Nov; the model's reading of one held-out
+brief differs between runs.
+
+What the simpler version no longer does:
+
+- It does not fill a list to the brief's head count. A brief that asks for
+  eight and has one roster creator who posts about the product shows that
+  one, plus applicants and prospects who fit. To see everyone who meets the
+  requirements whether or not they post about the product, remove the
+  "posts about" chip.
+- It does not hold picks to a total budget. The shortlist bar shows the
+  running cost and the person compares it with the brief.
+- "Nobody with a competing deal" is not applied as a rule. A creator whose
+  conflict note overlaps the topic is still shown, with the note in a "Check
+  before pitching" box.
+
+Limits: twelve briefs, written by the same person as the code, none held
+out. The only held-out reading figure is from 20 Nov with the earlier
+16-field reading: 95/96 fields and 5 of 6 briefs on the first run.

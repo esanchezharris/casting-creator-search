@@ -73,53 +73,6 @@ export type ParsedQuery = {
   /** Minimum share of the audience in the US, 0 to 100. */
   minAudienceUS: number | null;
   semantic: string;
-  /** Set when the text asked for a shortlist, not only a search: a head count, a total budget, or a whole brief. */
-  brief?: BriefAsk | null;
-};
-
-/** What a brand's brief asks for beyond who fits: how many, for how much, and on what terms. */
-export type BriefAsk = {
-  brand: string | null;
-  product: string | null;
-  /** How many creators the brand wants. */
-  count: number | null;
-  /** Budget for all of them together, in dollars. */
-  totalBudget: number | null;
-  /** What each creator makes, in the brief's words ("one reel each"). */
-  deliverable: string | null;
-  /** A date in the brief's words ("drafts due Feb 20"). */
-  deadline: string | null;
-  /** The brief rules out anyone tied to a competitor. */
-  noConflicts: boolean;
-  /** The follower range is a preference ("ideally 50K to 300K"), so a shortlist may stretch it. */
-  flexibleSize: boolean;
-  /** Figures the model returned that are not written anywhere in the brief. They are not used. */
-  dropped: string[];
-};
-
-/**
- * One creator in a proposed shortlist. Everyone meets the brief's hard requirements. `note` says
- * what is weaker about this pick, if anything: no recent post about the product, or a follower
- * count just outside a range the brief gave as a preference (`outside`).
- */
-export type PlanPick = SearchResult & { note: string | null; outside?: boolean };
-
-/** A shortlist put together from the search results to meet the brief's count and budget. */
-export type Plan = {
-  /** How many creators the plan aims for: the brief's count, or five. */
-  want: number;
-  budget: number | null;
-  /** In the order they were considered: exact fits first, then the ones that bend something. All have an agreed rate. */
-  picks: PlanPick[];
-  total: number;
-  reach: number;
-  /** Applicants and prospects who fit exactly, offered when the roster cannot. No rate, so not in the total. */
-  alternates: SearchResult[];
-  leftOut: { id: string; name: string; why: string }[];
-  /** Plain sentences about where the plan falls short of the brief, or stretches it. */
-  notes: string[];
-  /** Text to send to the brand. */
-  reply: string;
 };
 
 export type SearchResult = {
@@ -130,8 +83,6 @@ export type SearchResult = {
   matchedPost: number | null;
   /** A conflict note that touches the topic of this search. */
   warning: string | null;
-  /** Keyword matches only: no single post or note has every word of the topic. */
-  partial?: boolean;
 };
 
 export type SearchResponse = {
@@ -145,8 +96,6 @@ export type SearchResponse = {
   places: string[];
   /** How many creators carry each filter value, across the whole database, shown beside the options. */
   facets: Record<string, number>;
-  /** A proposed shortlist, when the brief asked for one. */
-  plan: Plan | null;
   tookMs: number;
 };
 

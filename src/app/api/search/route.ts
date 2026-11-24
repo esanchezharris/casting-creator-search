@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { parseQuery, PLACES, sanitize } from "@/lib/parse";
-import { buildPlan } from "@/lib/plan";
-import { FACETS, search, widen } from "@/lib/search";
+import { FACETS, search } from "@/lib/search";
 import type { SearchResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -27,11 +26,8 @@ export async function POST(req: Request) {
   }
 
   const { results, offRoster, ranker } = await search(parsed, FORCED.includes(body.ranker) ? body.ranker : undefined);
-  // A brief that asks for a shortlist may need more people than fit it exactly, either because
-  // too few do or because the budget cannot cover the ones who do.
-  const wider = parsed.brief ? await widen(parsed, new Set([...results, ...offRoster].map((r) => r.creator.id))) : [];
   const payload: SearchResponse = {
-    parsed, parser, ranker, results, offRoster, places: PLACES, facets: FACETS, plan: buildPlan(parsed, results, offRoster, wider), tookMs: Math.round(performance.now() - started),
+    parsed, parser, ranker, results, offRoster, places: PLACES, facets: FACETS, tookMs: Math.round(performance.now() - started),
   };
   return NextResponse.json(payload);
 }

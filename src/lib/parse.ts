@@ -1,12 +1,8 @@
 import creatorsJson from "../../data/creators.json";
 import { closest } from "./fuzzy";
-import { BriefAsk, Creator, GENDERS, LocationFilter, NICHES, ParsedQuery, Stage, STAGES } from "./types";
+import { Creator, GENDERS, LocationFilter, NICHES, ParsedQuery, Stage, STAGES } from "./types";
 
 const creators = creatorsJson as Creator[];
-
-export const emptyAsk = (): BriefAsk => ({
-  brand: null, product: null, count: null, totalBudget: null, deliverable: null, deadline: null, noConflicts: false, flexibleSize: false, dropped: [],
-});
 
 export const emptyQuery = (): ParsedQuery => ({
   niches: [], locations: [], stages: [], genders: [], minAge: null, maxAge: null, minFollowers: null, maxFollowers: null, maxRate: null,
@@ -147,16 +143,12 @@ export function parseWithRules(query: string): ParsedQuery {
   take(/(?<![a-z])(?:applicants?|applications?|applied)(?![a-z])/, () => addStages("applicant"));
   take(/(?<![a-z])(?:prospects?|scouted)(?![a-z])/, () => addStages("prospect"));
 
-  // A head count ("6 creators", "five women") asks for a shortlist of that size. Read before the
-  // gender words are removed, and only the number is taken out of the sentence.
-  const ask = emptyAsk();
+  // A head count ("6 creators", "five women") says how many to pick, not who fits, so only the
+  // number is taken out of the sentence. Read before the gender words are removed.
   {
     const WORDS: Record<string, number> = { two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, twelve: 12 };
     const WHO = String.raw`(?=\s+(?:[a-z-]+\s+){0,3}?(?:creators?|influencers?|people|women|men|talent)(?![a-z]))`;
-    take(new RegExp(String.raw`(?<![\d.,$–-]|aged\s|ages\s|over\s|under\s|to\s)(\d{1,2}|${Object.keys(WORDS).join("|")})(?![\d.,%+k–-])` + WHO), (m) => {
-      const n = WORDS[m[1]] ?? Number(m[1]);
-      if (n >= 2 && n <= 50) ask.count = n;
-    });
+    take(new RegExp(String.raw`(?<![\d.,$–-]|aged\s|ages\s|over\s|under\s|to\s)(\d{1,2}|${Object.keys(WORDS).join("|")})(?![\d.,%+k–-])` + WHO), () => {});
   }
 
   // Gender, only from plain words. "Women's running shoes" is a topic, so a possessive is left alone.
@@ -164,17 +156,14 @@ export function parseWithRules(query: string): ParsedQuery {
   take(/(?<![a-z])(?:men|man|males?|guys)(?![a-z'’])/, () => { out.genders.push("man"); });
 
   // Budget: a dollar amount is what the brief can pay one creator ("budget $2,000 each", "under $5k a reel").
-  // A total for the whole campaign says nothing about one creator's rate; it is kept as the
-  // budget the shortlist has to fit inside.
+  // A total for the whole campaign says nothing about one creator's rate, so it is only removed.
   {
     const LEAD = String.raw`(?:(?:with\s+)?(?:a\s+)?(?:total\s+|overall\s+)?(?:budget|rate)s?\s+(?:of\s+|is\s+|around\s+|up to\s+|under\s+)?|(?:under|below|up to|at most|max(?:imum)?|less than|for)\s+)?`;
     const AMOUNT = String.raw`\$\s*(\d[\d,]*(?:\.\d+)?)\s*(k(?![a-z]))?`;
     const TAIL = String.raw`(?:\s+(?:in\s+)?(?:total|overall|altogether|budget))?(?:\s+(?:each|per\s+(?:creator|person|post|reel|video)|a\s+(?:creator|post|reel|video|piece)|or\s+(?:less|under)))*`;
     take(new RegExp(LEAD + AMOUNT + TAIL), (m) => {
       const v = Math.round(parseFloat(m[1].replace(/,/g, "")) * (m[2] ? 1000 : 1));
-      if (v <= 0) return;
-      if (/total|overall|altogether/.test(m[0])) ask.totalBudget = v;
-      else out.maxRate = v;
+      if (v > 0 && !/total|overall|altogether/.test(m[0])) out.maxRate = v;
     });
   }
 
@@ -317,7 +306,6 @@ export function parseWithRules(query: string): ParsedQuery {
   });
 
   out.semantic = words.filter((w, i) => !drop.has(i) && !JOINERS.has(w) && !FILLER.has(w)).join(" ");
-  out.brief = ask.count != null || ask.totalBudget != null ? ask : null;
   return out;
 }
 
@@ -384,20 +372,7 @@ export function sanitize(raw: unknown): ParsedQuery {
   if (out.minFollowers != null && out.maxFollowers != null && out.minFollowers > out.maxFollowers)
     [out.minFollowers, out.maxFollowers] = [out.maxFollowers, out.minFollowers];
   out.semantic = typeof r.semantic === "string" ? r.semantic.trim().slice(0, 200) : "";
-  out.brief = sanitizeAsk(r.brief);
   return out;
-}
-
-function sanitizeAsk(raw: unknown): BriefAsk | null {
-  if (!raw || typeof raw !== "object") return null;
-  const r = raw as Record<string, unknown>;
-  const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 120) : null);
-  const whole = (v: unknown, max: number) => (typeof v === "number" && isFinite(v) && v >= 1 && v <= max ? Math.round(v) : null);
-  return {
-    brand: text(r.brand), product: text(r.product), count: whole(r.count, 50), totalBudget: whole(r.totalBudget, 100_000_000),
-    deliverable: text(r.deliverable), deadline: text(r.deadline), noConflicts: r.noConflicts === true, flexibleSize: r.flexibleSize === true,
-    dropped: Array.isArray(r.dropped) ? r.dropped.filter((d): d is string => typeof d === "string").slice(0, 6) : [],
-  };
 }
 
 export async function parseWithLLM(query: string): Promise<ParsedQuery> {
@@ -422,8 +397,6 @@ export async function parseWithLLM(query: string): Promise<ParsedQuery> {
   if (!parsed.semantic) parsed.semantic = rules.semantic;
   // Gender is read from plain words, which the rules do exactly; the model is not asked to guess it.
   parsed.genders = rules.genders;
-  // A head count and a total budget are read by the rules too.
-  parsed.brief = rules.brief;
   // So is a budget, and neither the amount nor the words around a campaign belong in the topic.
   parsed.maxRate = rules.maxRate;
   parsed.semantic = parsed.semantic
@@ -463,17 +436,11 @@ export const isBrief = (text: string) => {
 
 const BRIEF_SYSTEM = `${SYSTEM}
 
-The request here is a whole brief from a brand, usually an email. Read all of it. Besides the keys above, return a "brief" object:
-- "brand": the brand's name, or null.
-- "product": what is being promoted, in the brief's words, or null.
-- "count": how many creators the brand wants, as an integer, or null if it does not say.
-- "totalBudget": the budget for all creators together, in dollars, or null. Never compute it: only a total the brief states. A per-creator amount goes in "maxRate" instead, and you never divide a total to get one.
-- "deliverable": what each creator makes, in the brief's words ("one reel each"), or null.
-- "deadline": the one date that matters most to a creator, with its label ("drafts due Feb 20"), or null.
-- "noConflicts": true if the brief rules out creators who work with a competitor or have a conflicting deal.
-- "flexibleSize": true only if the brief hedges its follower range ("ideally", "around", "roughly", "preferably"). False if it gives no range or states one flatly.
+The request here is a whole brief from a brand, usually an email. Read all of it and return the same keys.
+How many creators the brand wants is not a filter: leave it out. So is a budget for all creators together: "maxRate" is only an amount the brief states per creator, and you never divide a total to get one.
+Dates, product sizes, shade counts and prices are not filters either.
 
-For a whole brief, "semantic" is the one to three plain words a creator would have used in a post about this kind of product ("sunscreen" for an SPF 50 face mist, "energy drinks" for a new canned energy drink). Not the brand name, not the campaign name.
+For a whole brief, "semantic" is the one to three plain words a creator would have used in a post about this kind of product ("sunscreen" for an SPF 50 face mist, "energy drinks" for a new canned energy drink). Not the brand name, not the campaign name. For an event, name what the brand sells ("coffee" for a café opening).
 "genders" and the age keys follow the creators the brief asks for, not the product's buyers, unless the brief says the creators should be that.
 Every number you return must be written in the brief. If the brief does not state something, return null for it.`;
 
@@ -495,13 +462,13 @@ function figuresIn(text: string): Set<number> {
  * one line, and an email has dates, product sizes and prices that are not filters. Instead
  * every number the model returns must be traceable to the brief: written there, or one off a
  * written number ("over 30" is 31), or the stated meaning of a word that is there ("twenties",
- * "micro", "mostly"). One that is not is dropped and reported. gpt-4o-mini once turned
+ * "micro", "mostly"). One that is not is dropped and logged. gpt-4o-mini once turned
  * "20K to 100K followers" into an age range of 20 to 29, and divided a total budget by the
  * head count to invent a per-creator rate.
  */
 export async function readBrief(text: string): Promise<ParsedQuery> {
   // A whole brief needs a stronger reader than one line does: on the six development briefs
-  // gpt-4o-mini misread three (docs/EVAL.md, "Brief to shortlist"), gpt-4.1 none in three runs.
+  // gpt-4o-mini misread three (docs/EVAL.md, "Reading a whole brief"), gpt-4.1 none in three runs.
   const model = process.env.BRIEF_MODEL ?? "gpt-4.1";
   const base = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1";
   const res = await fetch(`${base}/chat/completions`, {
@@ -517,30 +484,23 @@ export async function readBrief(text: string): Promise<ParsedQuery> {
   });
   if (!res.ok) throw new Error(`brief reader HTTP ${res.status}`);
   const parsed = sanitize(JSON.parse((await res.json()).choices[0].message.content));
-  const ask = parsed.brief ?? emptyAsk();
   const written = figuresIn(text);
   const lower = text.toLowerCase();
   const says = (re: RegExp) => re.test(lower);
   const check = (label: string, v: number | null, alsoFine = false) => {
     if (v == null || written.has(v) || alsoFine) return v;
-    ask.dropped.push(`${label} ${v.toLocaleString("en-US")}`);
+    console.warn(`brief reader: ${label} ${v.toLocaleString("en-US")} is not written in the brief, dropped`);
     return null;
   };
   const nearby = (v: number | null) => v != null && (written.has(v - 1) || written.has(v + 1));
   const decade = says(/twenties|thirties|forties|\b[234]0s\b|gen z|millennial/);
   const tier = says(/\b(?:nano|micro|mid|macro|mega)\b/);
-  ask.dropped = [];
-  ask.count = check("a head count of", ask.count);
-  ask.totalBudget = check("a total budget of $", ask.totalBudget);
   parsed.maxRate = check("a rate of $", parsed.maxRate);
   parsed.minAge = check("a minimum age of", parsed.minAge, nearby(parsed.minAge) || decade);
   parsed.maxAge = check("a maximum age of", parsed.maxAge, nearby(parsed.maxAge) || decade);
   parsed.minFollowers = check("a follower minimum of", parsed.minFollowers, nearby(parsed.minFollowers) || tier);
   parsed.maxFollowers = check("a follower maximum of", parsed.maxFollowers, nearby(parsed.maxFollowers) || tier);
   parsed.minAudienceUS = check("a US audience share of", parsed.minAudienceUS, says(/most|major|half|primar|us[- ]based audience|us audience|american/));
-  // The topic is what the search runs on. If the model left it out, the product is the next best thing.
-  if (!parsed.semantic && ask.product) parsed.semantic = ask.product.replace(/\(.*?\)/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
-  parsed.brief = ask;
   return parsed;
 }
 

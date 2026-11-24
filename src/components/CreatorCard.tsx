@@ -150,12 +150,13 @@ export function Facts({ creator, className }: { creator: Creator; className?: st
   const facts: [string, string][] = [
     [compact(creator.recentReach), "reach"],
     // Short labels and a compact rate, so four numbers fit under a narrow card without truncating.
+    // Under the smallest card sizes they are set two by two instead.
     [`${creator.engagement}%`, "eng."],
     [`${creator.audience.us}%`, "US"],
     creator.rate != null ? [`$${compact(creator.rate)}`, "rate"] : ["None", "rate"],
   ];
   return (
-    <dl className={cn("grid grid-cols-4 gap-2", className)}>
+    <dl className={cn("grid grid-cols-4 gap-2 @max-[180px]/card:grid-cols-2 @max-[180px]/card:gap-y-1.5", className)}>
       {facts.map(([value, label]) => (
         <div key={label} className="min-w-0">
           <dd className="truncate text-[14px] font-medium tabular-nums">{value}</dd>
@@ -219,7 +220,7 @@ export const CreatorCard = forwardRef<HTMLElement, Props>(function CreatorCard(
       tabIndex={-1}
       data-card
       className={cn(
-        "group/card flex flex-col rounded-2xl border border-transparent p-2 outline-none transition-colors duration-150",
+        "group/card @container/card flex flex-col rounded-2xl border border-transparent p-2 outline-none transition-colors duration-150",
         focused && "border-border bg-card",
       )}
       onPointerEnter={(e) => { setNear(true); if (e.pointerType === "mouse") onFocus(); }}
@@ -264,8 +265,9 @@ export const CreatorCard = forwardRef<HTMLElement, Props>(function CreatorCard(
       </div>
 
       <div className="flex flex-1 flex-col px-1 pt-2.5 pb-1">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="min-w-0 text-[15px] leading-tight font-medium">
+        {/* On a small card the stage sits under the name, so the name keeps the full width. */}
+        <div className="flex items-center justify-between gap-2 @max-[180px]/card:flex-col @max-[180px]/card:items-start @max-[180px]/card:gap-1">
+          <h3 className="max-w-full min-w-0 text-[15px] leading-tight font-medium">
             <button onClick={onOpen} className="max-w-full truncate text-left underline-offset-4 hover:underline">
               {creator.name}
             </button>

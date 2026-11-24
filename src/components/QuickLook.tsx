@@ -93,7 +93,7 @@ export function QuickLook({ result, position, picked, onPick, onClose, start }: 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/45 p-0 sm:p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-(--scrim) p-0 sm:p-6" onClick={onClose}>
       <div
         role="dialog" aria-modal="true" aria-label={`Quick look: ${creator.name}`}
         onClick={(e) => e.stopPropagation()}
@@ -236,7 +236,7 @@ export function QuickLook({ result, position, picked, onPick, onClose, start }: 
               <span className="flex items-center gap-2">
                 {picked ? <Check /> : <Plus />}{picked ? "Shortlisted" : "Add to shortlist"}
               </span>
-              <Kbd className={cn(picked && "bg-white/15 text-white")}>S</Kbd>
+              <Kbd className={cn(picked && "bg-primary-foreground/15 text-primary-foreground")}>S</Kbd>
             </Button>
             <span className="hidden shrink-0 items-center gap-1 text-[13px] text-muted-foreground sm:flex">
               {position} <Kbd>←</Kbd><Kbd>→</Kbd>

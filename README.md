@@ -85,21 +85,25 @@ the cutoffs were chosen and every known miss.
     npm run eval                                   # app must be running
     npm run eval -- --url http://localhost:3210    # if it is on another port
 
-## From a whole brief to a shortlist
+## Pasting a whole brief
 
-Paste a brand's brief instead of typing one line. A model reads it (who they
-want, how many, the total budget, "nobody with a competing deal"), and every
-number it returns has to be written in the brief or it is dropped. Then code,
-not a model, builds the shortlist from the search results: exact fits first,
-then creators who meet the brief but have no post about the product, each
-marked; nobody with a conflict note about the product; the total inside the
-budget. The panel shows how the brief was read, the picks with rates, who was
-left out and why, and gives the reply to send.
+Paste a brand's brief instead of typing one line. A model (gpt-4.1) reads it
+into the same filters a typed line produces, and every number it returns has
+to be written in the brief or it is dropped. A head count and a total
+campaign budget are not filters, so they are left out. The chips show how the
+brief was read; the grid shows who fits, roster first, with a "Check before
+pitching" box on anyone whose CRM notes record a conflict with the product.
+Picking is done by hand, and the shortlist bar adds up reach and cost.
 
-`npm run eval:briefs` scores twelve briefs. On the six held back, the first
-run read 95 of 96 fields and 4 of 6 shortlists passed every check; after
-three fixes all twelve pass, so there is no held-out brief left.
-[docs/EVAL.md](docs/EVAL.md), "Brief to shortlist", has what each run found.
+`npm run eval:briefs` scores twelve briefs written like the emails a brand
+sends. On 22 Nov 2026 (LLM parser, hybrid ranker) it read 144 of 144 fields
+in three runs, and everyone the grid showed met the brief on all twelve. All
+twelve have been used while the reader was worked on, so none is held out.
+[docs/EVAL.md](docs/EVAL.md), "Reading a whole brief", has the runs.
+
+An earlier version went one step further and proposed a priced shortlist
+from the brief. It was removed on 22 Nov because it made the tool harder to
+follow; the code is in git history at commit 88e1953.
 
 ## The language-model parts
 
@@ -141,7 +145,8 @@ face with different wording; the script's docstring has the details.
 
     scripts/seed.py              dataset generator (stage, audience, notes)
     scripts/eval.py              parser, P@5 and recall eval
-    scripts/eval_queries.json    56 test briefs
+    scripts/eval_queries.json    70 test briefs
+    scripts/eval_briefs.py       how whole pasted briefs are read (eval_briefs.json has twelve)
     scripts/embed.py             embeddings for profiles, posts and notes
     scripts/media_prompts.py     prompts for the AI-generated photo sets
     scripts/apply_media.py       links the files in public/creators to the data

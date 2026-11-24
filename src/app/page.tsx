@@ -1,23 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Copy, Keyboard, PanelLeftClose, Search, SlidersHorizontal } from "lucide-react";
+import { Copy, Grid2x2, Grid3x3, Keyboard, Moon, PanelLeftClose, Search, SlidersHorizontal, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { CreatorCard, compact, initials, money } from "@/components/CreatorCard";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Slider } from "@/components/ui/slider";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { FilterChips, summarize, type FilterEdit } from "@/components/FilterChips";
 import { activeCount, FilterPanel, SORTS, type Sort } from "@/components/FilterPanel";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { PlanPanel } from "@/components/PlanPanel";
 import { QuickLook } from "@/components/QuickLook";
 import { Segmented } from "@/components/Segmented";
 import { useElastic } from "@/lib/elastic";
-import type { Creator, PlanPick, SearchResponse, SearchResult } from "@/lib/types";
+import { DEFAULT_CARD, saveCardSize, savedCardSize, setMode, useMode } from "@/lib/view";
+import type { Creator, SearchResponse, SearchResult } from "@/lib/types";
 
-const NO_FILTERS = { niches: [], locations: [], stages: [], genders: [], minAge: null, maxAge: null, minFollowers: null, maxFollowers: null, maxRate: null, minEngagement: null, minAudienceUS: null, semantic: "", brief: null };
+const NO_FILTERS = { niches: [], locations: [], stages: [], genders: [], minAge: null, maxAge: null, minFollowers: null, maxFollowers: null, maxRate: null, minEngagement: null, minAudienceUS: null, semantic: "" };
 const PANEL = "casting.filters.v1";
 const KEYS: [string[], string][] = [
   [["←", "→", "↑", "↓"], "Move between creators"], [["Space"], "Open or close quick look"], [["S"], "Shortlist the focused creator"],
@@ -28,6 +30,8 @@ const PARSER_LABEL = { llm: "Read by the language model", rules: "Read by the ru
 const RANKER_LABEL = { embeddings: "ranked by meaning", keywords: "ranked by keywords", hybrid: "ranked by keywords and meaning", reach: "ordered by recent reach" };
 
 const STORE = "casting.shortlist.v1";
+// The grid's column gap, and the narrowest and widest a creator card may be drawn.
+const GAP = 4, SMALLEST = 150, LARGEST = 400;
 type Shortlist = { brief: string; creators: Creator[] };
 
 function sorted(list: SearchResult[], sort: Sort): SearchResult[] {
@@ -66,8 +70,6 @@ export default function Page() {
   const [sort, setSort] = useState<Sort>("match");
   const [focus, setFocus] = useState(-1);
   const [looking, setLooking] = useState(false);
-  // A creator opened from the proposed shortlist who is not among the cards below.
-  const [peek, setPeek] = useState<SearchResult | null>(null);
   const [typing, setTyping] = useState(false);
   const [shortlist, setShortlist] = useState<Shortlist>({ brief: "", creators: [] });
   const [restored, setRestored] = useState(false);
@@ -89,6 +91,11 @@ export default function Page() {
   };
   const filterList = useElastic<HTMLDivElement>();
   const pageBody = useElastic<HTMLDivElement>("y", true);
+  const mode = useMode();
+  // Card size. The grid fits as many columns as it can of at least `cardMin` pixels, so the
+  // slider has one stop per number of columns that fits the grid's width right now.
+  const [cardMin, setCardMin] = useState(DEFAULT_CARD);
+  const [width, setWidth] = useState(0);
 
   const input = useRef<HTMLTextAreaElement>(null);
   const cards = useRef<(HTMLElement | null)[]>([]);
@@ -108,7 +115,7 @@ export default function Page() {
       const json: SearchResponse = await res.json();
       if (id !== latest.current) return; // a newer search already answered
       asked.current = "query" in body ? body.query.trim() : summarize(json.parsed);
-      setData(json); setError(null); setFocus(-1); setLooking(false); setPeek(null); setSort("match"); setLoading(false);
+      setData(json); setError(null); setFocus(-1); setLooking(false); setSort("match"); setLoading(false);
       // A new answer starts at its first row, wherever the last one was scrolled to.
       window.scrollTo({ top: 0 });
     } catch {
@@ -119,6 +126,33 @@ export default function Page() {
   }, []);
 
   useEffect(() => { run({ query: "" }); }, [run]);
+
+  useEffect(() => {
+    setCardMin(savedCardSize());
+    if (!sheet.current) return;
+    const seen = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    seen.observe(sheet.current);
+    return () => seen.disconnect();
+  }, []);
+  const columnsAt = (min: number) => Math.max(1, Math.floor((width + GAP) / (min + GAP)));
+  const most = columnsAt(SMALLEST);
+  const fewest = Math.min(most, Math.max(1, Math.ceil((width + GAP) / (LARGEST + GAP))));
+  const stops = most - fewest;
+  // Left is the densest grid, right the largest cards.
+  const stop = most - Math.min(most, Math.max(fewest, columnsAt(cardMin)));
+  const resize = (next: number) => {
+    const columns = most - Math.max(0, Math.min(stops, next));
+    // The middle of the range of widths that gives this many columns, so a small change in the window keeps the count.
+    const px = Math.round(((width + GAP) / (columns + 1) + (width + GAP) / columns) / 2 - GAP);
+    if (px === cardMin) return;
+    // The creator at the top of the screen stays where it is while the grid reflows around it.
+    const at = window.scrollY > 0 ? cards.current.findIndex((el) => el && el.getBoundingClientRect().bottom > 56) : -1;
+    const el = at >= 0 ? cards.current[at] : null;
+    const before = el?.getBoundingClientRect().top;
+    saveCardSize(px);
+    if (el && before != null) window.scrollBy(0, el.getBoundingClientRect().top - before);
+    setCardMin(px);
+  };
 
   // The shortlist survives a reload. Storage can be blocked or full, so every touch is guarded.
   useEffect(() => {
@@ -152,13 +186,13 @@ export default function Page() {
       const typing = t instanceof HTMLTextAreaElement || t instanceof HTMLInputElement;
       if (e.key === "Escape") {
         if (typing) (t as HTMLElement).blur();
-        else { setLooking(false); setPeek(null); }
+        else setLooking(false);
         return;
       }
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "/") { e.preventDefault(); input.current?.focus(); input.current?.select(); return; }
       // While a search is running the cards on screen are the old answer: keys must not act on them.
-      if (!all.length || loading || peek) return;
+      if (!all.length || loading) return;
 
       const cols = sheet.current ? getComputedStyle(sheet.current).gridTemplateColumns.split(" ").length : 1;
       const step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: cols, ArrowUp: -cols }[e.key];
@@ -178,10 +212,10 @@ export default function Page() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [all, focus, toggle, loading, peek]);
+  }, [all, focus, toggle, loading]);
 
   // Quick look covers the page, so the page behind it should not scroll.
-  const lookOpen = (looking && focus >= 0) || !!peek;
+  const lookOpen = looking && focus >= 0;
   useEffect(() => {
     if (!lookOpen) return;
     document.body.style.overflow = "hidden";
@@ -195,26 +229,6 @@ export default function Page() {
     } catch {
       toast.error("Could not copy", { description: "The browser blocked the clipboard." });
     }
-  };
-
-  const copyReply = async () => {
-    if (!data?.plan) return;
-    try {
-      await navigator.clipboard.writeText(data.plan.reply);
-      toast.success("Reply copied", { description: "Names, rates, the total and what was left out." });
-    } catch {
-      toast.error("Could not copy", { description: "The browser blocked the clipboard." });
-    }
-  };
-  const addPlan = () => {
-    if (!data?.plan) return;
-    const add = data.plan.picks.map((p) => p.creator);
-    setShortlist((prev) => ({ brief: asked.current, creators: [...prev.creators, ...add.filter((c) => !prev.creators.some((x) => x.id === c.id))] }));
-  };
-  // A pick that is also a card opens there, so the arrow keys carry on from it.
-  const openPick = (p: PlanPick) => {
-    const i = all.findIndex((r) => r.creator.id === p.creator.id);
-    if (i >= 0) { setFocus(i); setLooking(true); } else setPeek(p);
   };
 
   // The brief box is one line until it is being typed in; a pasted brief gets room while it has the cursor.
@@ -231,7 +245,7 @@ export default function Page() {
   const signed = shortlist.creators.filter((c) => c.rate != null);
   const unsigned = shortlist.creators.length - signed.length;
   const hasFilters = !!data && summarize(data.parsed) !== "";
-  const open = peek ?? (looking && focus >= 0 ? all[focus] : null);
+  const open = looking && focus >= 0 ? all[focus] : null;
   const first = !data && loading;
 
   const card = (r: SearchResult, i: number) => (
@@ -249,13 +263,13 @@ export default function Page() {
     />
   );
 
-  const grid = "grid grid-cols-[repeat(auto-fill,minmax(min(100%,220px),1fr))] gap-x-1 gap-y-4";
+  const grid = "grid grid-cols-[repeat(auto-fill,minmax(min(100%,var(--card-min,220px)),1fr))] gap-x-1 gap-y-4";
   const parsed = data?.parsed ?? NO_FILTERS;
   const active = activeCount(parsed);
 
   return (
     <div className="lg:flex">
-      {panel && <div className="fixed inset-0 z-30 bg-foreground/30 lg:hidden" onClick={togglePanel} aria-hidden="true" />}
+      {panel && <div className="fixed inset-0 z-30 bg-(--scrim) lg:hidden" onClick={togglePanel} aria-hidden="true" />}
       {/* On a wide screen the panel's width closes to nothing and its contents, pinned to the right edge, slide out with it. */}
       <aside
         aria-label="Filters" inert={!panel}
@@ -311,6 +325,34 @@ export default function Page() {
               />
               <Button type="submit" size="sm" aria-busy={loading} className="press -my-px h-6 shrink-0 rounded-md px-2 text-[13px]">Search</Button>
             </div>
+            {/* View controls: how big the cards are, and light or dark. */}
+            <div className="flex h-8 shrink-0 items-center gap-0.5 max-md:hidden">
+              <Tooltip>
+                <TooltipTrigger render={<Button type="button" variant="ghost" size="icon" className="press size-7 text-muted-foreground" aria-label="Smaller cards" disabled={stop <= 0} onClick={() => resize(stop - 1)} />}>
+                  <Grid3x3 className="size-3.5" />
+                </TooltipTrigger>
+                <TooltipContent>Smaller cards</TooltipContent>
+              </Tooltip>
+              {/* After a drag the keyboard goes back to the grid, so the arrow keys move between creators again. */}
+              <div className="w-20" onPointerUp={(e) => { const box = e.currentTarget; requestAnimationFrame(() => { if (box.contains(document.activeElement)) (document.activeElement as HTMLElement).blur(); }); }}>
+                <Slider
+                  labels={["Card size"]} min={0} max={Math.max(1, stops)} step={1} disabled={stops === 0}
+                  value={[stop]} onValueChange={(v) => resize((v as number[])[0])}
+                />
+              </div>
+              <Tooltip>
+                <TooltipTrigger render={<Button type="button" variant="ghost" size="icon" className="press size-7 text-muted-foreground" aria-label="Larger cards" disabled={stop >= stops} onClick={() => resize(stop + 1)} />}>
+                  <Grid2x2 className="size-3.5" />
+                </TooltipTrigger>
+                <TooltipContent>Larger cards</TooltipContent>
+              </Tooltip>
+            </div>
+            <Tooltip>
+              <TooltipTrigger render={<Button type="button" variant="ghost" size="icon" className="press size-8 text-muted-foreground" aria-label={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"} onClick={() => setMode(mode === "dark" ? "light" : "dark")} />}>
+                {mode === "dark" ? <Sun /> : <Moon />}
+              </TooltipTrigger>
+              <TooltipContent>{mode === "dark" ? "Light mode" : "Dark mode"}</TooltipContent>
+            </Tooltip>
             <Popover>
               <PopoverTrigger render={<Button type="button" variant="ghost" size="icon" className="press size-8 text-muted-foreground max-sm:hidden" aria-label="Keyboard shortcuts" />}>
                 <Keyboard />
@@ -354,13 +396,6 @@ export default function Page() {
           </div>
         </div>
 
-        {!error && data?.plan && data.parsed.brief && (
-          <div className={cn("transition-opacity duration-150", loading && "pointer-events-none opacity-50")}>
-            <PlanPanel ask={data.parsed.brief} plan={data.plan} picked={picked} onAdd={addPlan} onCopy={copyReply} onOpen={openPick} />
-            {all.length > 0 && <h2 className="mt-5 text-[15px] font-medium">Everyone who fits exactly</h2>}
-          </div>
-        )}
-
         {error && (
           <div className="mt-12 max-w-md">
             <h2 className="text-[17px] font-medium">No answer from search</h2>
@@ -368,7 +403,7 @@ export default function Page() {
           </div>
         )}
 
-        {!error && !loading && data && all.length === 0 && !data.plan?.picks.length && (
+        {!error && !loading && data && all.length === 0 && (
           <div className="mt-12 max-w-md">
             <h2 className="text-[17px] font-medium">Nobody fits all of that</h2>
             <p className="mt-1 text-pretty text-muted-foreground">
@@ -417,10 +452,10 @@ export default function Page() {
         <QuickLook
           key={open.creator.id}
           result={open}
-          position={peek ? "Proposed shortlist" : `${focus + 1} of ${all.length}`}
+          position={`${focus + 1} of ${all.length}`}
           picked={picked.has(open.creator.id)}
           onPick={() => toggle(open.creator)}
-          onClose={() => { setLooking(false); setPeek(null); }}
+          onClose={() => setLooking(false)}
           start={frames.current.get(open.creator.id) ?? 0}
         />
       )}
@@ -429,7 +464,7 @@ export default function Page() {
         <aside
           aria-label="Shortlist"
           className={cn(
-            "tray fixed bottom-4 left-1/2 z-40 flex w-[min(640px,calc(100%-24px))] -translate-x-1/2 items-center gap-3 rounded-xl border bg-card py-1.5 pr-1.5 pl-3 shadow-[0_8px_30px_rgb(23_23_21/0.14)]",
+            "tray fixed bottom-4 left-1/2 z-40 flex w-[min(640px,calc(100%-24px))] -translate-x-1/2 items-center gap-3 rounded-xl border bg-card py-1.5 pr-1.5 pl-3 shadow-(--tray-shadow)",
             panel && "lg:left-[calc(50%+132px)]",
           )}
         >
