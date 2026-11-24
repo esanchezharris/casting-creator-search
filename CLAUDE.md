@@ -175,7 +175,7 @@ none held out. Numbers are in docs/EVAL.md, "Reading a whole brief".
 Removed on 22 Nov, do not add back: the proposed-shortlist step (a panel
 above the grid that picked creators to a head count and total budget in
 code, `plan.ts`, `PlanPanel`, `widen()`, a reply to copy). Emilio found it
-made the project too convoluted to follow. It is in git at 88e1953, and
+made the project too convoluted to follow. It is in git at cdca6eb, and
 docs/EVAL.md, "Brief to shortlist", is kept as the record of its runs.
 Labelled screenshots of the current app are in `docs/screenshots/`.
 
@@ -270,7 +270,8 @@ Port 3000 is often taken on Emilio's machine. `npx next dev --port 3210` and
 
 ## Design rules
 The palette reference is `docs/reference/questionnaire.png`, a screen from
-the agency's own applicant questionnaire. Emilio rejected a dark serif version as
+the agency's own applicant questionnaire (kept on Emilio's machine only: it
+shows their wordmark, so `docs/reference/` is not in git). Emilio rejected a dark serif version as
 over-styled, a second version (mono-caps buttons, key badges on every card)
 as vibe coded, and a third (big centred headline over a search box) as a
 consumer landing page. It is an internal tool: a dense dashboard with the

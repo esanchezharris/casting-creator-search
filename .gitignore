@@ -7,3 +7,5 @@ next-env.d.ts
 __pycache__
 .claude
 data/unsplash_cache.json
+# The agency's own screen, used as a palette reference. Not ours to publish.
+docs/reference/

@@ -103,7 +103,7 @@ twelve have been used while the reader was worked on, so none is held out.
 
 An earlier version went one step further and proposed a priced shortlist
 from the brief. It was removed on 22 Nov because it made the tool harder to
-follow; the code is in git history at commit 88e1953.
+follow; the code is in git history at commit cdca6eb.
 
 ## The language-model parts
 

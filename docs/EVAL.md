@@ -412,7 +412,7 @@ the LLM parser:
 | LLM + hybrid, for comparison | 0.99 | 0.84 | 4/4 | 0.82 | 0.96 | |
 
 A Claude model was also tried; the script failed on the response format and
-it was not scored. Inside the app (commit 5e206e6, removed afterwards), the
+it was not scored. Inside the app (commit 322aa96, removed afterwards), the
 judge alone scored tuned P@5 0.92 and recall 0.89 with the rule parser, and
 "keywords first, the judge when no creator has every word of the topic"
 scored 0.95 and 0.85 with the rule parser and 0.97 and 0.87 with the LLM
@@ -463,7 +463,7 @@ unchanged, line for line.
 
 *Removed from the app on 22 Nov 2026; see "Reading a whole brief" at the end.
 This section is kept as the record of what was run. The code is in git at
-commit 88e1953. The reading step (item 1) is still in the app, without the
+commit cdca6eb. The reading step (item 1) is still in the app, without the
 extra fields.*
 
 The conclusion from the section above was that the search was near what its
